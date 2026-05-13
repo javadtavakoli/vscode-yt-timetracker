@@ -162,11 +162,18 @@ const ACTIVITIES = ['Implementing','Investigating','Testing','Reviewing','Other'
 
 let issues = [];
 let states = [];
+let boardColumns = null;   // [{ presentation, fieldValues }] or null when no agile board
 let session = null;
 let elapsedMs = 0;
-let baseElapsed = 0;      // elapsed at the moment we last got state
 let sessionStartLocal = 0; // local Date.now() when session started/resumed
 let tickerId = null;
+
+// Find the board column an issue's state belongs to (so the badge / dropdown
+// show the column's display name instead of the raw state value).
+function columnForState(state) {
+  if (!boardColumns || !state) return null;
+  return boardColumns.find(c => c.fieldValues.includes(state)) || null;
+}
 
 // ── Formatting ──────────────────────────────────────────────────
 function formatDhms(ms) {
@@ -209,8 +216,13 @@ function renderTimer() {
 
 function getCurrentElapsed() {
   if (!session) return 0;
-  if (session.paused) return elapsedMs;
-  return elapsedMs + (Date.now() - sessionStartLocal);
+  // Display = previously-logged spent time on this task + current session elapsed,
+  // so restarting a task picks up from the accumulated total instead of zero.
+  const priorMs = (session.priorSpentMinutes || 0) * 60000;
+  const sessionMs = session.paused
+    ? elapsedMs
+    : elapsedMs + (Date.now() - sessionStartLocal);
+  return priorMs + sessionMs;
 }
 
 function startTick() {
@@ -241,9 +253,24 @@ function renderIssues() {
     const spent = issue.spentTime
       ? '⏱ ' + Math.floor(issue.spentTime/60) + 'h ' + (issue.spentTime%60) + 'm spent'
       : '';
-    const stateOpts = states.map(s =>
-      '<option' + (s === issue.state ? ' selected' : '') + '>' + escHtml(s) + '</option>'
-    ).join('');
+
+    // Prefer board columns when the project is on an agile board; the option
+    // value is the first underlying state value (what we POST to YouTrack).
+    let stateOpts;
+    if (boardColumns && boardColumns.length) {
+      const currentCol = columnForState(issue.state);
+      stateOpts = boardColumns.map(c => {
+        const isCurrent = currentCol && currentCol.presentation === c.presentation;
+        return '<option value="' + escHtml(c.fieldValues[0]) + '"' +
+               (isCurrent ? ' selected' : '') + '>' + escHtml(c.presentation) + '</option>';
+      }).join('');
+    } else {
+      stateOpts = states.map(s =>
+        '<option' + (s === issue.state ? ' selected' : '') + '>' + escHtml(s) + '</option>'
+      ).join('');
+    }
+
+    const badgeText = (columnForState(issue.state)?.presentation) || issue.state || '—';
     const actOpts = ACTIVITIES.map(a => '<option>' + a + '</option>').join('');
     const idAttr = escHtml(issue.id);
 
@@ -252,7 +279,7 @@ function renderIssues() {
         '<div class="issue-top">' +
           '<span class="issue-id">' + escHtml(issue.idReadable) + '</span>' +
           (isRunning ? '<span class="badge-running"><span class="pulse"></span>tracking</span>' : '') +
-          '<span class="issue-state-badge" style="margin-left:auto">' + escHtml(issue.state || '—') + '</span>' +
+          '<span class="issue-state-badge" style="margin-left:auto">' + escHtml(badgeText) + '</span>' +
         '</div>' +
         '<div class="issue-summary">' + escHtml(issue.summary) + '</div>' +
         (spent ? '<div class="issue-spent">' + spent + '</div>' : '') +
@@ -321,6 +348,7 @@ window.addEventListener('message', e => {
     // Full state update (issues list changed, connection changed, etc.)
     issues  = msg.issues  || [];
     states  = msg.states  || [];
+    boardColumns = msg.boardColumns || null;
     session = msg.session || null;
     elapsedMs = msg.elapsedMs || 0;
     sessionStartLocal = Date.now();

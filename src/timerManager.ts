@@ -17,14 +17,17 @@ export interface ActiveSession {
   elapsed: number;   // ms accumulated before current start
   paused: boolean;
   pausedAt?: number;
+  priorSpentMinutes: number; // YouTrack-recorded spent time when this session started; display = priorSpent + session elapsed
 }
 
 type SessionListener = (session: ActiveSession | null) => void;
+type LoggedListener = (issueId: string) => void;
 
 export class TimerManager {
   private session: ActiveSession | null = null;
   private ticker: NodeJS.Timeout | undefined;
   private listeners: SessionListener[] = [];
+  private loggedListeners: LoggedListener[] = [];
   private statusBar: vscode.StatusBarItem;
   private client: YouTrackClient | null = null;
 
@@ -33,7 +36,7 @@ export class TimerManager {
       vscode.StatusBarAlignment.Left,
       100
     );
-    this.statusBar.command = "youtrack.showPanel";
+    this.statusBar.command = "ylate.statusBarMenu";
     context.subscriptions.push(this.statusBar);
 
     // Restore persisted session
@@ -60,8 +63,26 @@ export class TimerManager {
     });
   }
 
+  onLogged(fn: LoggedListener): vscode.Disposable {
+    this.loggedListeners.push(fn);
+    return new vscode.Disposable(() => {
+      this.loggedListeners = this.loggedListeners.filter((l) => l !== fn);
+    });
+  }
+
   private emit() {
     for (const l of this.listeners) l(this.session);
+  }
+
+  private fireLogged(issueId: string) {
+    for (const l of this.loggedListeners) l(issueId);
+  }
+
+  /** Total ms to display: prior YouTrack-logged time + current session elapsed. */
+  get totalDisplayMs(): number {
+    if (!this.session) return 0;
+    const priorMs = (this.session.priorSpentMinutes || 0) * 60_000;
+    return priorMs + this.totalElapsedMs;
   }
 
   get current(): ActiveSession | null {
@@ -78,7 +99,8 @@ export class TimerManager {
     issueId: string | null,
     issueReadable: string,
     summary: string,
-    activity: ActivityType
+    activity: ActivityType,
+    priorSpentMinutes: number
   ) {
     // Auto-stop previous
     if (this.session) this.stopAndLog(false);
@@ -91,6 +113,7 @@ export class TimerManager {
       startedAt: Date.now(),
       elapsed: 0,
       paused: false,
+      priorSpentMinutes,
     };
     this.persist();
     this.updateStatusBar();
@@ -149,6 +172,7 @@ export class TimerManager {
         vscode.window.showInformationMessage(
           `✅ Logged ${formatDuration(ms)} on ${sess.issueReadable} (${sess.activity})`
         );
+        this.fireLogged(sess.issueId);
       } catch (err) {
         vscode.window.showErrorMessage(`Failed to log time: ${err}`);
       }
@@ -173,12 +197,12 @@ export class TimerManager {
       this.statusBar.hide();
       return;
     }
-    const ms = this.totalElapsedMs;
+    const ms = this.totalDisplayMs;
     const paused = this.session.paused;
     const label = this.session.issueReadable || this.session.summary.slice(0, 20);
     const icon = paused ? "$(debug-pause)" : "$(clock)";
     this.statusBar.text = `${icon} ${label}  ${formatDhms(ms)}${paused ? "  PAUSED" : ""}`;
-    this.statusBar.tooltip = `${this.session.summary}\n${this.session.activity}\nClick to open tracker`;
+    this.statusBar.tooltip = `${this.session.summary}\n${this.session.activity}\nClick for actions`;
     this.statusBar.backgroundColor = paused
       ? new vscode.ThemeColor("statusBarItem.warningBackground")
       : undefined;

@@ -177,6 +177,49 @@ export class YouTrackClient {
     );
   }
 
+  /**
+   * Get the columns of an agile board associated with this project.
+   * Each column maps to one or more underlying state field values; we expose
+   * the column's visible `presentation` plus the list of `fieldValues` it
+   * covers so callers can change an issue's state to the column's first value.
+   * Returns null if no board is found for the project.
+   */
+  async getBoardColumns(
+    projectShortName: string
+  ): Promise<{ presentation: string; fieldValues: string[] }[] | null> {
+    try {
+      const fields =
+        "name,projects(shortName),columnSettings(columns(presentation,fieldValues(name)))";
+      const boards = await this.get<Record<string, unknown>[]>(
+        `api/agiles?fields=${fields}&$top=50`
+      );
+
+      const myBoard = boards.find((b) => {
+        const projects = (b.projects as Record<string, unknown>[]) || [];
+        return projects.some((p) => p.shortName === projectShortName);
+      });
+      if (!myBoard) return null;
+
+      const cs = myBoard.columnSettings as Record<string, unknown> | undefined;
+      const cols = (cs?.columns as Record<string, unknown>[]) || [];
+      const out = cols
+        .map((c) => {
+          const fvs = (c.fieldValues as Record<string, unknown>[]) || [];
+          return {
+            presentation: String(c.presentation || ""),
+            fieldValues: fvs
+              .map((fv) => String(fv.name || ""))
+              .filter(Boolean),
+          };
+        })
+        .filter((c) => c.presentation && c.fieldValues.length);
+
+      return out.length ? out : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Get available states for a project */
   async getStates(projectId: string): Promise<string[]> {
     try {

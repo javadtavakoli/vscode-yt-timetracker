@@ -6,6 +6,7 @@ import { getPanelHtml } from "./panelHtml";
 let client: YouTrackClient | null = null;
 let issues: YTIssue[] = [];
 let states: string[] = [];
+let boardColumns: { presentation: string; fieldValues: string[] }[] | null = null;
 let timerManager: TimerManager;
 let webviewView: vscode.WebviewView | undefined;
 let connected = false;
@@ -18,15 +19,33 @@ export async function activate(context: vscode.ExtensionContext) {
   timerManager.onUpdate(() => sendState());
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("youtrack.configure", runConfigure),
-    vscode.commands.registerCommand("youtrack.refreshTasks", refreshTasks),
-    vscode.commands.registerCommand("youtrack.pauseResume", () => timerManager.togglePause()),
-    vscode.commands.registerCommand("youtrack.stopTimer", () => timerManager.stopAndLog(true)),
-    vscode.commands.registerCommand("youtrack.startCustom", cmdStartCustom),
-    vscode.commands.registerCommand("youtrack.showPanel", () =>
+    vscode.commands.registerCommand("ylate.configure", runConfigure),
+    vscode.commands.registerCommand("ylate.refreshTasks", refreshTasks),
+    vscode.commands.registerCommand("ylate.pauseResume", () => timerManager.togglePause()),
+    vscode.commands.registerCommand("ylate.stopTimer", () => timerManager.stopAndLog(true)),
+    vscode.commands.registerCommand("ylate.startCustom", cmdStartCustom),
+    vscode.commands.registerCommand("ylate.showPanel", () =>
       vscode.commands.executeCommand("workbench.view.extension.youtrack-tracker")
-    )
+    ),
+    vscode.commands.registerCommand("ylate.statusBarMenu", showStatusBarMenu)
   );
+
+  // After a successful log, refresh that issue's spentTime so the next
+  // Start of the same task picks up from the new accumulated total.
+  timerManager.onLogged(async (issueId) => {
+    if (!client) return;
+    try {
+      const updated = await client.getIssue(issueId);
+      const idx = issues.findIndex((i) => i.id === issueId);
+      if (idx >= 0) {
+        issues[idx].spentTime = updated.spentTime;
+        issues[idx].state = updated.state ?? issues[idx].state;
+      }
+      sendAll();
+    } catch {
+      // non-fatal
+    }
+  });
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -57,11 +76,14 @@ class TrackerWebviewProvider implements vscode.WebviewViewProvider {
           // Webview signals it's ready - send all current state
           sendAll();
           break;
-        case "start":
-          timerManager.start(msg.issueId, msg.issueReadable, msg.summary, msg.activity as ActivityType);
+        case "start": {
+          const issue = issues.find((i) => i.id === msg.issueId);
+          const prior = issue?.spentTime ?? 0;
+          timerManager.start(msg.issueId, msg.issueReadable, msg.summary, msg.activity as ActivityType, prior);
           break;
+        }
         case "startCustom":
-          timerManager.start(null, "", msg.summary, msg.activity as ActivityType);
+          timerManager.start(null, "", msg.summary, msg.activity as ActivityType, 0);
           break;
         case "pauseResume":
           timerManager.togglePause();
@@ -94,6 +116,7 @@ function sendAll() {
     type: "init",
     issues,
     states,
+    boardColumns,
     session: timerManager.current,
     elapsedMs: timerManager.totalElapsedMs,
     connected,
@@ -151,16 +174,20 @@ async function refreshTasks() {
   const myOnly = cfg.get<boolean>("myIssuesOnly", true);
 
   if (!projectId) {
-    errorMsg = "No project configured. Run 'YouTrack: Configure Connection'.";
+    errorMsg = "No project configured. Run 'Ylate: Configure Connection'.";
     sendAll();
     return;
   }
 
   try {
-    [issues, states] = await Promise.all([
+    const [fetchedIssues, fetchedStates, fetchedColumns] = await Promise.all([
       client.getIssues(projectId, myOnly),
       client.getStates(projectId),
+      client.getBoardColumns(projectId),
     ]);
+    issues = fetchedIssues;
+    states = fetchedStates;
+    boardColumns = fetchedColumns;
     errorMsg = "";
   } catch (err) {
     errorMsg = `Failed to load issues: ${err}`;
@@ -244,5 +271,36 @@ async function cmdStartCustom() {
   );
   if (!actPick) return;
 
-  timerManager.start(null, "", name, actPick as ActivityType);
+  timerManager.start(null, "", name, actPick as ActivityType, 0);
+}
+
+async function showStatusBarMenu() {
+  const session = timerManager.current;
+  if (!session) {
+    // No active timer — just open the panel
+    vscode.commands.executeCommand("workbench.view.extension.youtrack-tracker");
+    return;
+  }
+
+  const pauseLabel = session.paused ? "$(play) Resume" : "$(debug-pause) Pause";
+  const items: vscode.QuickPickItem[] = [
+    { label: pauseLabel },
+    { label: "$(debug-stop) Stop & Log" },
+    { label: "$(layout-sidebar-left) Open Panel" },
+  ];
+
+  const headerLabel = session.issueReadable || session.summary;
+  const pick = await vscode.window.showQuickPick(items, {
+    title: `${headerLabel} — ${session.activity}`,
+    placeHolder: "What now?",
+  });
+  if (!pick) return;
+
+  if (pick.label.includes("Resume") || pick.label.includes("Pause")) {
+    timerManager.togglePause();
+  } else if (pick.label.includes("Stop")) {
+    await timerManager.stopAndLog(true);
+  } else {
+    vscode.commands.executeCommand("workbench.view.extension.youtrack-tracker");
+  }
 }
