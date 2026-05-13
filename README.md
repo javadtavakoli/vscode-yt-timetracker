@@ -1,4 +1,4 @@
-# YouTrack Time Tracker
+# Ylate — YouTrack Time Tracker
 
 Track time on YouTrack issues directly from VS Code. Start, pause, resume, and stop a per-issue timer with an activity tag (Implementing / Investigating / Testing / Reviewing / Other), and the elapsed time is automatically logged back to YouTrack as a work item when you stop. The current task is always visible in the status bar.
 
@@ -29,7 +29,7 @@ The token needs `Read Issue`, `Update Issue`, and `Create Work Item` permissions
 
 ### Tracking a YouTrack issue
 
-1. Open the **YouTrack Tracker** panel from the activity bar (clock icon).
+1. Open the **Ylate** panel from the activity bar (clock icon).
 2. Find the issue, choose an activity type, click **▶ Start**.
 3. The status bar shows the running timer.
 4. Click **⏸ Pause** to pause (status bar turns yellow); click again to resume.

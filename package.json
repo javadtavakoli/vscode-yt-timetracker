@@ -1,6 +1,6 @@
 {
-  "name": "youtrack-time-tracker",
-  "displayName": "YouTrack Time Tracker",
+  "name": "ylate",
+  "displayName": "Ylate",
   "description": "Track time on YouTrack tasks with activity types, column management, and status bar integration",
   "version": "1.0.0",
   "publisher": "JavadTavakoli",
@@ -26,6 +26,7 @@
   ],
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
+  "icon": "resources/icon.png",
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
@@ -46,7 +47,7 @@
       ]
     },
     "configuration": {
-      "title": "YouTrack Time Tracker",
+      "title": "Ylate",
       "properties": {
         "youtrackTracker.baseUrl": {
           "type": "string",
@@ -74,7 +75,7 @@
       "activitybar": [
         {
           "id": "youtrack-tracker",
-          "title": "YouTrack Tracker",
+          "title": "Ylate",
           "icon": "resources/icon.svg"
         }
       ]

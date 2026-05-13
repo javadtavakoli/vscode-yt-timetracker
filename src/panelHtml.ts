@@ -7,7 +7,7 @@ export function getPanelHtml(webview: vscode.Webview): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YouTrack Tracker</title>
+<title>Ylate</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
@@ -101,7 +101,7 @@ export function getPanelHtml(webview: vscode.Webview): string {
 <body>
 
 <div class="header">
-  <span class="header-title">⏱ YouTrack Tracker</span>
+  <span class="header-title">⏱ Ylate</span>
   <div class="header-status">
     <div class="dot" id="connDot"></div>
     <span class="status-text" id="connText">connecting…</span>

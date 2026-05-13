@@ -9,7 +9,7 @@ npm install                # one-time, populates node_modules + @types
 npm run compile            # tsc -p ./   →  out/*.js
 npm run watch              # tsc --watch (use during development)
 npx @vscode/vsce package --allow-missing-repository --no-dependencies   # build .vsix
-code --install-extension youtrack-time-tracker-<version>.vsix --force   # install into local VS Code
+code --install-extension ylate-<version>.vsix --force                  # install into local VS Code
 ```
 
 There is no test suite and no linter. TypeScript `strict` is on, so the compiler is the only static check.
