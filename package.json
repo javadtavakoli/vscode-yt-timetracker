@@ -1,0 +1,102 @@
+{
+  "name": "youtrack-time-tracker",
+  "displayName": "YouTrack Time Tracker",
+  "description": "Track time on YouTrack tasks with activity types, column management, and status bar integration",
+  "version": "1.0.0",
+  "publisher": "JavadTavakoli",
+  "author": {
+    "name": "Javad Tavakoli",
+    "email": "javadtavakoli95@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/javadtavakoli/vscode-yt-timetracker#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/javadtavakoli/vscode-yt-timetracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/javadtavakoli/vscode-yt-timetracker/issues"
+  },
+  "keywords": [
+    "youtrack",
+    "time-tracking",
+    "timer",
+    "issue-tracker",
+    "productivity"
+  ],
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "youtrack.configure",      "title": "YouTrack: Configure Connection" },
+      { "command": "youtrack.refreshTasks",   "title": "YouTrack: Refresh Tasks" },
+      { "command": "youtrack.pauseResume",    "title": "YouTrack: Pause / Resume Timer",  "icon": "$(debug-pause)" },
+      { "command": "youtrack.stopTimer",      "title": "YouTrack: Stop Timer",            "icon": "$(debug-stop)" },
+      { "command": "youtrack.startCustom",    "title": "YouTrack: Track Custom Task" },
+      { "command": "youtrack.showPanel",      "title": "YouTrack: Open Tracker Panel" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "youtrack.pauseResume" },
+        { "command": "youtrack.stopTimer" },
+        { "command": "youtrack.startCustom" },
+        { "command": "youtrack.showPanel" }
+      ]
+    },
+    "configuration": {
+      "title": "YouTrack Time Tracker",
+      "properties": {
+        "youtrackTracker.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "YouTrack base URL (e.g. https://yourcompany.youtrack.cloud)"
+        },
+        "youtrackTracker.token": {
+          "type": "string",
+          "default": "",
+          "description": "YouTrack permanent token"
+        },
+        "youtrackTracker.projectId": {
+          "type": "string",
+          "default": "",
+          "description": "YouTrack project short name (e.g. PROJ)"
+        },
+        "youtrackTracker.myIssuesOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show only issues assigned to me"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "youtrack-tracker",
+          "title": "YouTrack Tracker",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "youtrack-tracker": [
+        {
+          "id": "youtrackTasks",
+          "name": "Tasks",
+          "type": "webview"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
