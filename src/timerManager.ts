@@ -24,8 +24,17 @@ type SessionListener = (session: ActiveSession | null) => void;
 type LoggedListener = (issueId: string) => void;
 
 export class TimerManager {
+  // While a timer runs, every N ticks we roll the segment into `elapsed` and
+  // persist. Worst-case data loss on a hard crash is ~CHECKPOINT_TICKS seconds.
+  private static readonly CHECKPOINT_TICKS = 60;
+  // On restore, gaps shorter than this are credited silently (assume crash /
+  // window reload). Longer gaps freeze at the last checkpoint so an overnight
+  // close doesn't get counted as worked time.
+  private static readonly RESTORE_GRACE_MS = 5 * 60 * 1000;
+
   private session: ActiveSession | null = null;
   private ticker: NodeJS.Timeout | undefined;
+  private ticksSinceCheckpoint = 0;
   private listeners: SessionListener[] = [];
   private loggedListeners: LoggedListener[] = [];
   private statusBar: vscode.StatusBarItem;
@@ -44,8 +53,19 @@ export class TimerManager {
     if (saved) {
       this.session = saved;
       if (!saved.paused) {
-        // adjust startedAt so elapsed calc is correct
-        this.session!.startedAt = Date.now();
+        const gap = Date.now() - saved.startedAt;
+        if (gap > TimerManager.RESTORE_GRACE_MS) {
+          // Long downtime — freeze at the last checkpoint. User can resume
+          // manually if they were actually working through it.
+          this.session.paused = true;
+          this.session.pausedAt = saved.startedAt;
+          this.persist();
+          const min = Math.round(gap / 60000);
+          vscode.window.showInformationMessage(
+            `⏸ Paused "${saved.summary}" — VS Code was away ~${min}m; click the status bar to resume.`
+          );
+        }
+        // else: small gap, leave startedAt — totalElapsedMs naturally credits it.
       }
       this.updateStatusBar();
       this.startTicker();
@@ -185,11 +205,30 @@ export class TimerManager {
 
   private startTicker() {
     clearInterval(this.ticker);
+    this.ticksSinceCheckpoint = 0;
     this.ticker = setInterval(() => {
-      if (!this.session?.paused) {
+      if (this.session && !this.session.paused) {
         this.updateStatusBar();
+        if (++this.ticksSinceCheckpoint >= TimerManager.CHECKPOINT_TICKS) {
+          this.ticksSinceCheckpoint = 0;
+          this.checkpoint();
+        }
       }
     }, 1000);
+  }
+
+  /**
+   * Roll the current running segment's elapsed time into `session.elapsed`,
+   * reset `startedAt` to now, and persist. After this, the persisted state
+   * accurately reflects all worked time up to this moment — so a crash
+   * before the next checkpoint loses at most CHECKPOINT_TICKS seconds.
+   */
+  private checkpoint() {
+    if (!this.session || this.session.paused) return;
+    const now = Date.now();
+    this.session.elapsed += now - this.session.startedAt;
+    this.session.startedAt = now;
+    this.persist();
   }
 
   private updateStatusBar() {
