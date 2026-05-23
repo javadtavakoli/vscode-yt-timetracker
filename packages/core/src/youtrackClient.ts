@@ -1,6 +1,19 @@
 import type { Issue, BoardColumn, Project } from "./types";
 
+/**
+ * Fetch-compatible function. Defaults to `globalThis.fetch`. Hosts where the
+ * webview enforces CORS for cross-origin requests (Tauri's WebKit2GTK on
+ * Linux is the loud one — "TypeError: Load failed") inject a host-side fetch
+ * implementation that runs through Rust / native HTTP and isn't subject to
+ * the same-origin policy.
+ */
+export type FetchFn = (
+  input: string | URL,
+  init?: RequestInit
+) => Promise<Response>;
+
 async function request(
+  fetchFn: FetchFn,
   baseUrl: string,
   token: string,
   method: string,
@@ -15,7 +28,7 @@ async function request(
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
-  const response = await fetch(url, {
+  const response = await fetchFn(url, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -28,14 +41,35 @@ async function request(
 }
 
 export class YouTrackClient {
-  constructor(private baseUrl: string, private token: string) {}
+  private fetchFn: FetchFn;
+
+  constructor(
+    private baseUrl: string,
+    private token: string,
+    fetchFn?: FetchFn
+  ) {
+    this.fetchFn = fetchFn ?? globalThis.fetch.bind(globalThis);
+  }
 
   private get<T>(path: string): Promise<T> {
-    return request(this.baseUrl, this.token, "GET", path) as Promise<T>;
+    return request(
+      this.fetchFn,
+      this.baseUrl,
+      this.token,
+      "GET",
+      path
+    ) as Promise<T>;
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {
-    return request(this.baseUrl, this.token, "POST", path, body) as Promise<T>;
+    return request(
+      this.fetchFn,
+      this.baseUrl,
+      this.token,
+      "POST",
+      path,
+      body
+    ) as Promise<T>;
   }
 
   /** Verify connection and return the authenticated user's display name. */

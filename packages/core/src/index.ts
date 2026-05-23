@@ -23,6 +23,6 @@ export {
   type LoggerFn,
 } from "./timerCore";
 
-export { YouTrackClient } from "./youtrackClient";
+export { YouTrackClient, type FetchFn } from "./youtrackClient";
 
 export { formatDhms, formatDuration } from "./format";

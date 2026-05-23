@@ -11,6 +11,7 @@ import {
 } from "@ylate/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { Store } from "@tauri-apps/plugin-store";
 import { getDesktopTransport } from "./api";
 
@@ -160,7 +161,10 @@ export async function bootstrapDesktopHost(): Promise<void> {
       return;
     }
     try {
-      client = new YouTrackClient(config.baseUrl, config.token);
+      // tauri-plugin-http's fetch runs through Rust → reqwest, sidestepping
+      // the WebKit2GTK CORS policy that throws "TypeError: Load failed" on
+      // Linux for cross-origin YouTrack requests.
+      client = new YouTrackClient(config.baseUrl, config.token, tauriFetch);
       await client.ping();
       connected = true;
       errorMsg = "";
