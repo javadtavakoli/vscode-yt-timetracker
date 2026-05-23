@@ -1,7 +1,7 @@
 # Ylate Desktop — Plan
 
-> Status: **Phase 4 partial — Preferences UI + keychain landed; Phase 5 (release pipeline) is next**
-> Phases done: **0** ✓ • **1** ✓ • **2** ✓ • **3** ✓ • **4** ◐ (tray-icon variants + GNOME verification deferred)
+> Status: **All planned phases landed — pending first real-OS verification of the Tauri build**
+> Phases done: **0** ✓ • **1** ✓ • **2** ✓ • **3** ✓ • **4** ◐ (tray-icon variants + GNOME verification deferred) • **5** ✓
 > Target platforms: Windows 10+, macOS 11+, Ubuntu 22.04+ (and modern Linux)
 > Framework: **Tauri 2**
 > Distribution: **GitHub Releases**
@@ -51,7 +51,7 @@ ylate/
 | 2 | Extract `ui` | `panelHtml.ts` → real vite bundle; message protocol typed; VS Code webview loads it | 0.5 day | ✓ done |
 | 3 | Tauri skeleton | Window, tray (with per-OS title/tooltip), `tauri-plugin-store` for state, single-instance lock, opt-in autostart, IPC plumbing, renderer-side host wiring `TimerCore` to React UI | 1.5 days | ✓ done |
 | 4 | Cross-platform polish | **Preferences view** ✓ • **token → OS keychain** via `keyring` crate ✓ • autostart toggle wired through Preferences ✓ • Windows paused/running tray-icon variants ✗ • GNOME (AppIndicator) + KDE verification ✗ • CSP tightening ✗ | 1 day | ◐ partial |
-| 5 | Packaging & release | `tauri-action` GitHub workflow building `.dmg` / `.exe` / `.deb` / `.AppImage` on tag push, attached to a GH Release | 0.5 day | |
+| 5 | Packaging & release | [`tauri-action`](https://github.com/tauri-apps/tauri-action) workflow in [.github/workflows/release-desktop.yml](../.github/workflows/release-desktop.yml). Builds `.dmg` (universal mac), `.deb` + `.AppImage` (Linux x86_64), `.msi` + NSIS `.exe` (Windows x86_64) on `desktop-v*` tag push, drafts a GH Release with the installers attached. `workflow_dispatch` exercises the build without releasing. | 0.5 day | ✓ done |
 
 **Total: ~5 focused days** (≈1 week real-world).
 

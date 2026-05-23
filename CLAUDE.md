@@ -28,6 +28,8 @@ pnpm --filter @ylate/desktop dev                      # opens Tauri window with 
 pnpm --filter @ylate/desktop tauri-build              # produces .dmg / .deb / .AppImage / .msi
 ```
 
+**Releasing the desktop app:** push a `desktop-v*` tag (e.g. `desktop-v0.1.0`) and the [`release-desktop`](.github/workflows/release-desktop.yml) workflow builds installers on macOS, Windows, and Linux runners via `tauri-action` and uploads them to a draft GH Release. Bump the version in three places before tagging: `packages/desktop/package.json`, `packages/desktop/src-tauri/Cargo.toml`, `packages/desktop/src-tauri/tauri.conf.json`.
+
 There is no test suite and no linter. TypeScript `strict` is on; the typecheck step in `vscode-ext`'s build script runs `tsc --noEmit`. esbuild is what actually emits the runtime bundle.
 
 **Build a fresh `.vsix` with all UI changes:** the `vscode-ext` package script does NOT re-run upstream package builds — running `pnpm --filter ylate build` after editing `packages/ui/src/*.tsx` will silently inline the *stale* `packages/ui/dist/index.html`. Either run `pnpm build` from the repo root (Turbo orchestrates the order) or chain the upstream builds explicitly:

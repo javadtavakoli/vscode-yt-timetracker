@@ -1,0 +1,111 @@
+name: release-desktop
+
+# Builds Ylate Desktop on macOS, Windows, and Linux when a `desktop-v*` tag
+# is pushed (e.g. `desktop-v0.1.0`), and attaches the resulting installers to
+# a draft GitHub Release. Review the draft and publish manually.
+#
+# To cut a release:
+#   1. Bump version in packages/desktop/{package.json, src-tauri/Cargo.toml,
+#      src-tauri/tauri.conf.json}.
+#   2. Commit, then: git tag desktop-v0.1.0 && git push --tags
+#   3. Wait ~10–20 min for all three runners to finish.
+#   4. Review and publish the draft Release on GitHub.
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch: {}
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            label: macOS (universal)
+            args: '--target universal-apple-darwin'
+          - platform: ubuntu-22.04
+            label: Linux x86_64
+            args: ''
+          - platform: windows-latest
+            label: Windows x86_64
+            args: ''
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential curl wget file \
+            libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsecret-1-dev
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS Rust targets (universal binary)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Cache Cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'packages/desktop/src-tauri -> target'
+          shared-key: ${{ matrix.platform }}
+
+      - name: Generate per-OS Tauri icon set
+        run: pnpm --filter @ylate/desktop icons
+
+      - name: Build & upload (tauri-action)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: packages/desktop
+          # Only create / update the GH Release when triggered by a tag push.
+          # workflow_dispatch runs just exercise the build.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Ylate Desktop {0}', github.ref_name) || '' }}
+          releaseBody: |
+            Ylate Desktop — YouTrack time tracker for Windows, macOS, and Linux.
+
+            **First-run note:** v0.1 builds are **unsigned**, so your OS may show a "developer cannot be verified" warning the first time:
+            - macOS: right-click the .dmg → Open, confirm.
+            - Windows: SmartScreen → "More info" → "Run anyway".
+            - Linux: AppImage just `chmod +x` and run.
+
+            See [the README](https://github.com/javadtavakoli/vscode-yt-timetracker/blob/main/packages/desktop/README.md) for setup and known limitations.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

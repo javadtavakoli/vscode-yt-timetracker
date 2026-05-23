@@ -56,7 +56,25 @@ That regenerates `32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, and 
 
 ## Distribution: GitHub Releases
 
-Hooking up `tauri-action` to build on each OS runner on tag push is on the roadmap (see [docs/plan-desktop.md](../../docs/plan-desktop.md) Phase 5). For now, build locally on each target OS.
+The repo ships a [`release-desktop` workflow](../../.github/workflows/release-desktop.yml) (`tauri-action`) that builds on three OS runners and attaches the installers to a draft GitHub Release.
+
+**To cut a release:**
+
+```bash
+# 1. Bump the version in three places (keep them in sync):
+#    packages/desktop/package.json                "version"
+#    packages/desktop/src-tauri/Cargo.toml        version
+#    packages/desktop/src-tauri/tauri.conf.json   version
+#
+# 2. Commit the bump, then push a `desktop-v…` tag:
+git tag desktop-v0.1.0
+git push origin desktop-v0.1.0
+#
+# 3. Wait ~10–20 min for the workflow. Review the draft Release on GitHub,
+#    edit the body if you want, then publish.
+```
+
+`workflow_dispatch` (Run workflow button on the Actions tab) builds the same binaries without creating a release — useful for verifying CI before tagging.
 
 ## Architecture pointers
 
