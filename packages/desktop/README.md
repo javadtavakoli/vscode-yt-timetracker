@@ -16,8 +16,10 @@ Ylate as a native Tauri 2 app for Windows, macOS, and Linux. Loads the same `@yl
       libxdo-dev libssl-dev \
       libayatana-appindicator3-dev \
       librsvg2-dev \
+      libgtk-3-dev libglib2.0-dev \
       libsecret-1-dev libdbus-1-dev   # keychain-backed YouTrack token
     ```
+    (`libgtk-3-dev` and `libglib2.0-dev` are usually pulled in transitively by `libwebkit2gtk-4.1-dev`, but list them explicitly so a partial install doesn't leave you missing headers like `glib-2.0.pc`.)
   - **macOS:** Xcode Command Line Tools (`xcode-select --install`)
   - **Windows:** Microsoft C++ Build Tools and WebView2 (preinstalled on Windows 10/11)
 
