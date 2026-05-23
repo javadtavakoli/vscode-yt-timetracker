@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.javadtavakoli.ylate",
   "build": {
-    "beforeDevCommand": "pnpm --filter @ylate/ui dev",
-    "beforeBuildCommand": "pnpm --filter @ylate/ui build",
+    "beforeDevCommand": "pnpm --filter @ylate/core build && pnpm --filter @ylate/ui dev",
+    "beforeBuildCommand": "pnpm --filter @ylate/core build && pnpm --filter @ylate/ui build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../ui/dist"
   },
