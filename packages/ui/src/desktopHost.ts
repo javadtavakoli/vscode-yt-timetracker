@@ -75,25 +75,35 @@ export async function bootstrapDesktopHost(): Promise<void> {
   const stateStore = await Store.load(STATE_FILE);
   const configStore = await Store.load(CONFIG_FILE);
 
-  // Token comes from the OS keychain via the Rust `get_token` command; the
-  // other fields are non-secret and live in tauri-plugin-store. Migration
-  // path: if a token is still in the store from an earlier build, move it
-  // into the keychain and clear it from the file.
-  const legacyToken = (await configStore.get<string>("token")) ?? "";
-  if (legacyToken) {
-    await invoke("set_token", { token: legacyToken }).catch(() => {});
-    await configStore.set("token", null);
-    await configStore.save();
-  }
+  // Token loading: prefer the OS keychain via the Rust `get_token` command,
+  // fall back to the config file. The fallback exists because Linux Secret
+  // Service / gnome-keyring can be unavailable for several reasons
+  // (keyring locked, D-Bus session timing, headless / minimal installs,
+  // AppImage running before the keyring daemon is up) — silently treating
+  // those as "no token" would make the user re-enter on every launch.
+  //
+  // On save we always write to BOTH so the token survives whichever backend
+  // happens to work on a given system. Plaintext token in tauri-plugin-store
+  // is a security downgrade vs. keyring-only; document accordingly.
+  const keyringToken =
+    (await invoke<string | null>("get_token").catch(() => null)) ?? "";
+  const fileToken = (await configStore.get<string>("token")) ?? "";
 
   const config: DesktopConfig = {
     baseUrl: (await configStore.get<string>("baseUrl")) ?? "",
-    token:
-      legacyToken ||
-      ((await invoke<string | null>("get_token").catch(() => null)) ?? ""),
+    token: keyringToken || fileToken,
     projectId: (await configStore.get<string>("projectId")) ?? "",
     myIssuesOnly: (await configStore.get<boolean>("myIssuesOnly")) ?? true,
   };
+
+  // Keep the two stores in sync: if one has a token and the other doesn't,
+  // propagate so the next launch can read from either side.
+  if (keyringToken && !fileToken) {
+    await configStore.set("token", keyringToken);
+    await configStore.save();
+  } else if (fileToken && !keyringToken) {
+    await invoke("set_token", { token: fileToken }).catch(() => {});
+  }
 
   const storage = await TauriStoreSessionStorage.create(stateStore);
   const core = new TimerCore(storage);
@@ -253,9 +263,14 @@ export async function bootstrapDesktopHost(): Promise<void> {
         if (cmd.token !== undefined) {
           config.token = cmd.token;
           if (cmd.token === "") {
+            // Wipe from both backends.
             await invoke("delete_token").catch(() => {});
+            await configStore.set("token", null);
           } else {
+            // Write to both backends — keyring is best-effort, file is
+            // the fallback that always works.
             await invoke("set_token", { token: cmd.token }).catch(() => {});
+            await configStore.set("token", cmd.token);
           }
         }
         await configStore.set("baseUrl", config.baseUrl);

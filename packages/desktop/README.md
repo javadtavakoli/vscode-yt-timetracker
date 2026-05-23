@@ -86,10 +86,11 @@ git push origin desktop-v0.1.0
 
 ## Known limitations (v0.1)
 
-- Linux GNOME without the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/) won't show the tray icon. The main window always reflects the current timer state as a fallback.
-- No paused/running tray-icon variants on Windows — only the title/tooltip changes for now.
-- No auto-update yet. `pnpm tauri-build` produces installers; manual upgrade between versions until `tauri-plugin-updater` is wired in.
-- No code signing — distributables will trigger Gatekeeper/SmartScreen warnings on first launch.
+- **Linux GNOME tray** — vanilla GNOME has no system tray at all. Install the [AppIndicator and KStatusNotifierItem Support](https://extensions.gnome.org/extension/615/appindicator-support/) extension (`sudo apt install gnome-shell-extension-appindicator` then enable it in GNOME Tweaks / Extensions), log out and back in. With the extension, the tray icon **and** the running-timer text (e.g. `PROJ-12 1h:23m`) appear inline. Without it, you can still see the active timer in the **window title** (visible in the taskbar / Activities overview / Alt-Tab) — Ylate updates it every second.
+- **Token storage** — preferred location is the OS keychain (macOS Keychain, Windows Credential Manager, Linux libsecret/gnome-keyring). If the keychain backend isn't available (locked, headless install, missing daemon), Ylate falls back to plaintext in the per-user config file under the app data dir. Reads check both; writes go to both. If you want to force keychain-only storage open an issue.
+- **No paused/running tray-icon variants** on Windows — only the title/tooltip text changes for now.
+- **No auto-update yet.** `pnpm tauri-build` produces installers; manual upgrade between versions until `tauri-plugin-updater` is wired in.
+- **No code signing** — distributables will trigger Gatekeeper/SmartScreen warnings on first launch.
 
 ## Configuration
 
