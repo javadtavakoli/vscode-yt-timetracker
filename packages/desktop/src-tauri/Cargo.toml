@@ -1,0 +1,27 @@
+[package]
+name = "ylate-desktop"
+version = "0.1.0"
+edition = "2021"
+authors = ["Javad Tavakoli <javadtavakoli95@gmail.com>"]
+license = "MIT"
+description = "Ylate desktop — YouTrack time tracker for Windows, macOS, and Linux."
+
+[lib]
+name = "ylate_desktop_lib"
+path = "src/lib.rs"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-store = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

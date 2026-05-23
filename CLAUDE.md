@@ -6,22 +6,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **pnpm + Turbo monorepo**.
 
-- [`packages/core`](packages/core) — `@ylate/core`. Pure timer state machine + YouTrack HTTP client + shared types + host↔UI message contract. No VS Code, no DOM, no `setInterval`. Runs in Node, browsers, Electron, and Tauri.
-- [`packages/ui`](packages/ui) — `@ylate/ui`. React + Vite panel UI, built to a single self-contained HTML (`vite-plugin-singlefile`). Loaded by VS Code's webview today and Tauri's renderer in Phase 3.
+- [`packages/core`](packages/core) — `@ylate/core`. Pure timer state machine + YouTrack HTTP client + shared types + host↔UI message contract. No VS Code, no DOM, no `setInterval`. Output is ESM (`"type": "module"`) so Vite/Rollup can statically resolve named exports. Runs in Node, browsers, Electron, and Tauri.
+- [`packages/ui`](packages/ui) — `@ylate/ui`. React + Vite panel UI, built to a single self-contained HTML (`vite-plugin-singlefile`). Bundle detects host: VS Code's `acquireVsCodeApi()` or Tauri's `window.__TAURI_INTERNALS__`. When running in Tauri it bootstraps an in-renderer host (`desktopHost.ts`) that owns `TimerCore` and persists via `tauri-plugin-store`.
 - [`packages/vscode-ext`](packages/vscode-ext) — the VS Code extension (`JavadTavakoli.ylate`). Thin host shell over `@ylate/core`; inlines `@ylate/ui`'s HTML at bundle time via esbuild's `--loader:.html=text`.
-- Planned (see [docs/plan-desktop.md](docs/plan-desktop.md)): `packages/desktop` (Tauri).
+- [`packages/desktop`](packages/desktop) — `@ylate/desktop`. Tauri 2 app (Win/Mac/Linux). Rust backend provides system tray (live title on macOS / tooltip on Windows/Linux), window-close-hides-to-tray, single-instance lock, opt-in autostart. Frontend is the same `@ylate/ui` bundle, no separate Vite app. See [packages/desktop/README.md](packages/desktop/README.md) for the system-deps install.
 
 ## Commands
 
 ```bash
 pnpm install                                          # one-time, hydrates all workspaces
-pnpm build                                            # turbo build across all packages — IMPORTANT, see warning below
-pnpm --filter @ylate/core build                       # build core only → packages/core/dist/
-pnpm --filter @ylate/ui build                         # build UI only → packages/ui/dist/index.html
+pnpm build                                            # turbo build across all JS packages — see warning below
+pnpm --filter @ylate/core build                       # core only → packages/core/dist/
+pnpm --filter @ylate/ui build                         # ui only → packages/ui/dist/index.html
 pnpm --filter ylate build                             # typecheck + esbuild bundle → packages/vscode-ext/dist/extension.js
 pnpm --filter ylate watch                             # esbuild --watch (re-bundle on save)
 pnpm --filter ylate package                           # produce ylate-<version>.vsix
 code --install-extension packages/vscode-ext/ylate-<version>.vsix --force
+
+# Desktop (Tauri) — requires Rust + system deps (see packages/desktop/README.md)
+pnpm --filter @ylate/desktop dev                      # opens Tauri window with Vite HMR
+pnpm --filter @ylate/desktop tauri-build              # produces .dmg / .deb / .AppImage / .msi
 ```
 
 There is no test suite and no linter. TypeScript `strict` is on; the typecheck step in `vscode-ext`'s build script runs `tsc --noEmit`. esbuild is what actually emits the runtime bundle.

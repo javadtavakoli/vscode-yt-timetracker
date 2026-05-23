@@ -1,0 +1,17 @@
+{
+  "name": "@ylate/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ylate desktop app (Tauri 2). Loads the same @ylate/ui bundle the VS Code extension uses.",
+  "scripts": {
+    "dev": "tauri dev",
+    "tauri-build": "tauri build",
+    "tauri": "tauri",
+    "icons": "tauri icon ../vscode-ext/resources/icon.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
+    "@ylate/core": "workspace:*",
+    "@ylate/ui": "workspace:*"
+  }
+}

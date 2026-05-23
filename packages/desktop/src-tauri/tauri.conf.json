@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Ylate",
+  "version": "0.1.0",
+  "identifier": "com.javadtavakoli.ylate",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @ylate/ui dev",
+    "beforeBuildCommand": "pnpm --filter @ylate/ui build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Ylate",
+        "width": 420,
+        "height": 720,
+        "minWidth": 360,
+        "minHeight": 540,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: ipc: tauri:; connect-src 'self' ipc: tauri: https:"
+    },
+    "trayIcon": {
+      "id": "main",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "title": "Ylate",
+      "tooltip": "Ylate"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "copyright": "Copyright © 2026 Javad Tavakoli",
+    "shortDescription": "YouTrack time tracker",
+    "longDescription": "Track time on YouTrack issues with activity tags, agile-board column moves, and crash-resilient session persistence — same engine as the Ylate VS Code extension."
+  }
+}

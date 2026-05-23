@@ -1,0 +1,13 @@
+# Tauri / Cargo build outputs
+src-tauri/target/
+src-tauri/gen/
+# Cargo.lock IS committed for binary crates (this one) — do not gitignore
+
+# Generated icon sets (run `pnpm icons` to regenerate)
+src-tauri/icons/32x32.png
+src-tauri/icons/128x128@2x.png
+src-tauri/icons/icon.icns
+src-tauri/icons/icon.ico
+
+# Build output
+dist/
