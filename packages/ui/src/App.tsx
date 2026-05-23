@@ -5,13 +5,15 @@ import {
   useState,
 } from "react";
 import type {
+  AppConfig,
   BoardColumn,
   HostMessage,
   Issue,
   Session,
   ActivityType,
 } from "@ylate/core";
-import { getTransport, type Transport } from "./api";
+import { getTransport, isTauri, type Transport } from "./api";
+import { PreferencesView } from "./PreferencesView";
 
 const ACTIVITIES: ActivityType[] = [
   "Implementing",
@@ -75,6 +77,11 @@ export function App() {
   // Activity selection per issue (default "Implementing")
   const [activityById, setActivityById] = useState<Record<string, ActivityType>>({});
 
+  // Preferences view state — only used in the desktop shell. VS Code keeps
+  // its own native input-box flow on `configure`.
+  const [view, setView] = useState<"main" | "preferences">("main");
+  const [config, setConfig] = useState<AppConfig | null>(null);
+
   // Per-second ticker — drives the timer display without round-tripping the host.
   const [, setNowTick] = useState(0);
   useEffect(() => {
@@ -102,6 +109,12 @@ export function App() {
         setSession(msg.session);
         setServerElapsedMs(msg.elapsedMs);
         setServerSyncAt(Date.now());
+      } else if (msg.type === "config") {
+        setConfig(msg.config);
+      } else if (msg.type === "showPreferences") {
+        setView("preferences");
+        // request a fresh config snapshot so the form pre-fills
+        transport.post({ cmd: "getConfig" });
       }
     });
 
@@ -147,11 +160,39 @@ export function App() {
   const pauseResume = () => post?.({ cmd: "pauseResume" });
   const stopTimer = () => post?.({ cmd: "stop" });
   const refresh = () => post?.({ cmd: "refresh" });
-  const configure = () => post?.({ cmd: "configure" });
+  const configure = () => {
+    if (isTauri()) {
+      // Desktop: switch to the in-app Preferences view and ask for fresh state.
+      setView("preferences");
+      post?.({ cmd: "getConfig" });
+    } else {
+      // VS Code: host handles the input-box flow.
+      post?.({ cmd: "configure" });
+    }
+  };
   const moveIssue = (issueId: string, state: string) =>
     post?.({ cmd: "move", issueId, state });
+  const savePreferences = (cfg: {
+    baseUrl: string;
+    token: string | undefined;
+    projectId: string;
+    myIssuesOnly: boolean;
+    autostart: boolean;
+  }) => {
+    post?.({ cmd: "saveConfig", ...cfg });
+    setView("main");
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (view === "preferences") {
+    return (
+      <PreferencesView
+        initialConfig={config}
+        onSave={savePreferences}
+        onCancel={() => setView("main")}
+      />
+    );
+  }
   return (
     <>
       <Header connected={connected} onRefresh={refresh} onConfigure={configure} />

@@ -15,7 +15,8 @@ Ylate as a native Tauri 2 app for Windows, macOS, and Linux. Loads the same `@yl
       build-essential curl wget file \
       libxdo-dev libssl-dev \
       libayatana-appindicator3-dev \
-      librsvg2-dev
+      librsvg2-dev \
+      libsecret-1-dev          # for the keychain-backed YouTrack token
     ```
   - **macOS:** Xcode Command Line Tools (`xcode-select --install`)
   - **Windows:** Microsoft C++ Build Tools and WebView2 (preinstalled on Windows 10/11)
@@ -65,7 +66,17 @@ Hooking up `tauri-action` to build on each OS runner on tag push is on the roadm
 
 ## Known limitations (v0.1)
 
-- Token is stored in plaintext via `tauri-plugin-store` (`config.json` under the app data dir). Migration to the system keychain (`tauri-plugin-keyring`) is planned but not in v0.1.
 - Linux GNOME without the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/) won't show the tray icon. The main window always reflects the current timer state as a fallback.
-- No Preferences window yet — the `configure` button in the panel currently shows an error placeholder. Configure manually by editing the store file (path printed by `tauri-plugin-store` on first run) until the Preferences UI lands.
+- No paused/running tray-icon variants on Windows — only the title/tooltip changes for now.
 - No auto-update yet. `pnpm tauri-build` produces installers; manual upgrade between versions until `tauri-plugin-updater` is wired in.
+- No code signing — distributables will trigger Gatekeeper/SmartScreen warnings on first launch.
+
+## Configuration
+
+After install, open the app and click the ⚙ button in the panel header (or the Preferences entry in the tray menu) to set:
+
+- **Base URL** — your YouTrack instance, e.g. `https://yourcompany.youtrack.cloud`
+- **Permanent token** — generate at *Profile → Account Security → Tokens* in YouTrack. **Stored in the OS keychain** (macOS Keychain, Windows Credential Manager, Linux libsecret), never written to a file.
+- **Project short name** — e.g. `PROJ`
+- **My issues only** — filter the issue list to yourself
+- **Launch on login** — opt-in autostart toggle

@@ -2,6 +2,7 @@ import {
   TimerCore,
   YouTrackClient,
   type ActivityType,
+  type AppConfig,
   type BoardColumn,
   type Issue,
   type Session,
@@ -9,6 +10,7 @@ import {
   type UICommand,
 } from "@ylate/core";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Store } from "@tauri-apps/plugin-store";
 import { getDesktopTransport } from "./api";
 
@@ -34,6 +36,8 @@ const SESSION_KEY = "activeSession";
 
 interface DesktopConfig {
   baseUrl: string;
+  /** In-memory token, sourced from the OS keychain via the Rust `get_token`
+   * command. Empty string when no token is set. Never persisted to a file. */
   token: string;
   projectId: string;
   myIssuesOnly: boolean;
@@ -70,9 +74,22 @@ export async function bootstrapDesktopHost(): Promise<void> {
   const stateStore = await Store.load(STATE_FILE);
   const configStore = await Store.load(CONFIG_FILE);
 
+  // Token comes from the OS keychain via the Rust `get_token` command; the
+  // other fields are non-secret and live in tauri-plugin-store. Migration
+  // path: if a token is still in the store from an earlier build, move it
+  // into the keychain and clear it from the file.
+  const legacyToken = (await configStore.get<string>("token")) ?? "";
+  if (legacyToken) {
+    await invoke("set_token", { token: legacyToken }).catch(() => {});
+    await configStore.set("token", null);
+    await configStore.save();
+  }
+
   const config: DesktopConfig = {
     baseUrl: (await configStore.get<string>("baseUrl")) ?? "",
-    token: (await configStore.get<string>("token")) ?? "",
+    token:
+      legacyToken ||
+      ((await invoke<string | null>("get_token").catch(() => null)) ?? ""),
     projectId: (await configStore.get<string>("projectId")) ?? "",
     myIssuesOnly: (await configStore.get<boolean>("myIssuesOnly")) ?? true,
   };
@@ -215,14 +232,43 @@ export async function bootstrapDesktopHost(): Promise<void> {
         sendInit();
         break;
       case "configure":
-        // Surface the configure event to Rust so it can open the Preferences
-        // window. The Rust side reads/writes the config store and emits a
-        // `config-changed` event we'll listen for in a follow-up.
-        await invoke("open_preferences").catch(() => {
-          errorMsg = "Preferences window is not wired up yet.";
-          sendInit();
+        // The React UI handles this itself in Tauri mode (switches view).
+        // This branch is for completeness — VS Code never reaches here.
+        transport.deliverToUI({ type: "showPreferences" });
+        break;
+      case "getConfig":
+        transport.deliverToUI({
+          type: "config",
+          config: await snapshotConfig(),
         });
         break;
+      case "saveConfig": {
+        config.baseUrl = cmd.baseUrl;
+        config.projectId = cmd.projectId;
+        config.myIssuesOnly = cmd.myIssuesOnly;
+        if (cmd.token !== undefined) {
+          config.token = cmd.token;
+          if (cmd.token === "") {
+            await invoke("delete_token").catch(() => {});
+          } else {
+            await invoke("set_token", { token: cmd.token }).catch(() => {});
+          }
+        }
+        await configStore.set("baseUrl", config.baseUrl);
+        await configStore.set("projectId", config.projectId);
+        await configStore.set("myIssuesOnly", config.myIssuesOnly);
+        await configStore.save();
+        await invoke("set_autostart", { enabled: cmd.autostart }).catch(() => {});
+
+        await connect();
+        if (connected) await refresh();
+        sendInit();
+        transport.deliverToUI({
+          type: "config",
+          config: await snapshotConfig(),
+        });
+        break;
+      }
       case "move":
         if (!client) return;
         try {
@@ -236,6 +282,24 @@ export async function bootstrapDesktopHost(): Promise<void> {
         }
         break;
     }
+  });
+
+  async function snapshotConfig(): Promise<AppConfig> {
+    const autostartEnabled =
+      (await invoke<boolean>("is_autostart_enabled").catch(() => false)) ??
+      false;
+    return {
+      baseUrl: config.baseUrl,
+      projectId: config.projectId,
+      myIssuesOnly: config.myIssuesOnly,
+      hasToken: !!config.token,
+      autostartEnabled,
+    };
+  }
+
+  // Tray menu "Preferences" / open_preferences IPC → switch UI to prefs view.
+  void listen("show-preferences", () => {
+    transport.deliverToUI({ type: "showPreferences" });
   });
 
   // 1-second ticker drives TimerCore checkpoint policy (every 60 ticks)

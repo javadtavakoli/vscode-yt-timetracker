@@ -17,18 +17,51 @@ fn set_tray_text(app: AppHandle, text: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens (or focuses) the main window so the user can hit the Preferences UI
-/// inside the React panel. Once we have a dedicated Preferences window we
-/// will open that instead.
+/// Brings the main window forward and tells the renderer to switch to its
+/// Preferences view. Invoked from the tray menu and from `Open Preferences`
+/// IPC.
 #[tauri::command]
 fn open_preferences(app: AppHandle) -> Result<(), String> {
     if let Some(win) = app.get_webview_window("main") {
         let _ = win.show();
         let _ = win.set_focus();
-        // Renderer can listen for this and switch its view to Preferences.
-        let _ = app.emit("open-preferences", ());
     }
+    let _ = app.emit("show-preferences", ());
     Ok(())
+}
+
+/* ─────────────────── OS-native token storage (keyring) ──────────────────── */
+
+const KEYRING_SERVICE: &str = "com.javadtavakoli.ylate";
+const KEYRING_USER: &str = "youtrack-token";
+
+#[tauri::command]
+fn get_token() -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+        .map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(s) => Ok(Some(s)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn set_token(token: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+        .map_err(|e| e.to_string())?;
+    entry.set_password(&token).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_token() -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+        .map_err(|e| e.to_string())?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// Opt-in autostart toggle, surfaced from the Preferences UI.
@@ -69,8 +102,9 @@ pub fn run() {
             // Tray with a small "Open" / "Quit" menu plus the live title that
             // gets updated by the renderer via `set_tray_text`.
             let open_item = MenuItem::with_id(app, "open", "Open Ylate", true, None::<&str>)?;
+            let prefs_item = MenuItem::with_id(app, "preferences", "Preferences…", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&open_item, &prefs_item, &quit_item])?;
 
             let icon = app
                 .default_window_icon()
@@ -105,6 +139,13 @@ pub fn run() {
                             let _ = win.set_focus();
                         }
                     }
+                    "preferences" => {
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
+                        let _ = app.emit("show-preferences", ());
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -128,7 +169,10 @@ pub fn run() {
             set_tray_text,
             open_preferences,
             set_autostart,
-            is_autostart_enabled
+            is_autostart_enabled,
+            get_token,
+            set_token,
+            delete_token
         ])
         .run(tauri::generate_context!())
         .expect("error while running Ylate desktop");

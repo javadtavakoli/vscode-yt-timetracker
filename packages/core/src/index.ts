@@ -8,6 +8,7 @@ export type {
   FrozenInfo,
   HostMessage,
   UICommand,
+  AppConfig,
 } from "./types";
 
 export type { SessionStorage } from "./storage";

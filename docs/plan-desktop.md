@@ -1,7 +1,7 @@
 # Ylate Desktop — Plan
 
-> Status: **Phase 3 (Tauri skeleton) landed; Phase 4 (cross-platform polish) is next**
-> Phases done: **0** ✓ • **1** ✓ • **2** ✓ • **3** ✓
+> Status: **Phase 4 partial — Preferences UI + keychain landed; Phase 5 (release pipeline) is next**
+> Phases done: **0** ✓ • **1** ✓ • **2** ✓ • **3** ✓ • **4** ◐ (tray-icon variants + GNOME verification deferred)
 > Target platforms: Windows 10+, macOS 11+, Ubuntu 22.04+ (and modern Linux)
 > Framework: **Tauri 2**
 > Distribution: **GitHub Releases**
@@ -50,7 +50,7 @@ ylate/
 | 1 | Extract `core` | Timer state machine pulled out of `TimerManager` (no `StatusBarItem`, no `workspaceState` — those become adapters); `YouTrackClient` ported `node:https` → `fetch`; `vscode-ext` rewired through it | 1 day | ✓ done |
 | 2 | Extract `ui` | `panelHtml.ts` → real vite bundle; message protocol typed; VS Code webview loads it | 0.5 day | ✓ done |
 | 3 | Tauri skeleton | Window, tray (with per-OS title/tooltip), `tauri-plugin-store` for state, single-instance lock, opt-in autostart, IPC plumbing, renderer-side host wiring `TimerCore` to React UI | 1.5 days | ✓ done |
-| 4 | Cross-platform polish | Windows tray icon variants for paused/running, Linux tray fallback verified on GNOME (AppIndicator) + KDE, **Preferences window**, **token → keychain** (`tauri-plugin-keyring`), CSP tightening | 1 day | next |
+| 4 | Cross-platform polish | **Preferences view** ✓ • **token → OS keychain** via `keyring` crate ✓ • autostart toggle wired through Preferences ✓ • Windows paused/running tray-icon variants ✗ • GNOME (AppIndicator) + KDE verification ✗ • CSP tightening ✗ | 1 day | ◐ partial |
 | 5 | Packaging & release | `tauri-action` GitHub workflow building `.dmg` / `.exe` / `.deb` / `.AppImage` on tag push, attached to a GH Release | 0.5 day | |
 
 **Total: ~5 focused days** (≈1 week real-world).

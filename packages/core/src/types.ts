@@ -67,6 +67,19 @@ export interface FrozenInfo {
  * `@tauri-apps/api` events) but the wire shape is shared.
  * ──────────────────────────────────────────────────────────────────────────── */
 
+/** Sanitized config snapshot — never carries the raw token. */
+export interface AppConfig {
+  baseUrl: string;
+  projectId: string;
+  myIssuesOnly: boolean;
+  /** True when a token is stored (in the OS keychain on desktop); the value
+   * itself is never sent to the UI. */
+  hasToken: boolean;
+  /** Whether the desktop app is registered to launch on login. Always false
+   * on VS Code where this concept doesn't apply. */
+  autostartEnabled: boolean;
+}
+
 export type HostMessage =
   | {
       type: "init";
@@ -82,7 +95,9 @@ export type HostMessage =
       type: "timerUpdate";
       session: Session | null;
       elapsedMs: number;
-    };
+    }
+  | { type: "config"; config: AppConfig }
+  | { type: "showPreferences" };
 
 export type UICommand =
   | { cmd: "ready" }
@@ -98,4 +113,15 @@ export type UICommand =
   | { cmd: "stop" }
   | { cmd: "refresh" }
   | { cmd: "configure" }
-  | { cmd: "move"; issueId: string; state: string };
+  | { cmd: "move"; issueId: string; state: string }
+  | { cmd: "getConfig" }
+  | {
+      cmd: "saveConfig";
+      baseUrl: string;
+      /** Only present when the user changed the token field; if `undefined`
+       * the host keeps the existing keychain value. Empty string clears it. */
+      token: string | undefined;
+      projectId: string;
+      myIssuesOnly: boolean;
+      autostart: boolean;
+    };

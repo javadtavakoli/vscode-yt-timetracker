@@ -21,6 +21,9 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# OS-native keychain for the YouTrack token: macOS Keychain, Windows
+# Credential Manager, Linux libsecret (needs libsecret-1-dev at build time).
+keyring = "3"
 
 [features]
 default = ["custom-protocol"]
