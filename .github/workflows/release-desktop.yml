@@ -69,7 +69,14 @@ jobs:
           cache: pnpm
 
       - name: Install JS dependencies
-        run: pnpm install --frozen-lockfile
+        # --ignore-scripts because pnpm 11 escalates IGNORED_BUILDS to a hard
+        # error in CI (the local TTY path just prints a warning). None of the
+        # postinstall scripts in our tree are required:
+        #   * esbuild ships its binary in @esbuild/<platform> subpackages
+        #   * @vscode/vsce-sign is only used for signed extensions
+        #   * keytar comes transitively via vsce; desktop uses the Rust
+        #     `keyring` crate for keychain access
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
