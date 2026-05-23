@@ -1,145 +1,17 @@
 {
-  "name": "ylate",
-  "displayName": "Ylate",
-  "description": "Track time on YouTrack tasks with activity types, column management, and status bar integration",
-  "version": "1.1.1",
-  "publisher": "JavadTavakoli",
-  "author": {
-    "name": "Javad Tavakoli",
-    "email": "javadtavakoli95@gmail.com"
-  },
-  "license": "MIT",
-  "homepage": "https://github.com/javadtavakoli/vscode-yt-timetracker#readme",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/javadtavakoli/vscode-yt-timetracker.git"
-  },
-  "bugs": {
-    "url": "https://github.com/javadtavakoli/vscode-yt-timetracker/issues"
-  },
-  "keywords": [
-    "youtrack",
-    "time-tracking",
-    "timer",
-    "issue-tracker",
-    "productivity"
-  ],
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "icon": "resources/icon.png",
-  "activationEvents": [
-    "onStartupFinished"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "ylate.configure",
-        "title": "Ylate: Configure Connection"
-      },
-      {
-        "command": "ylate.refreshTasks",
-        "title": "Ylate: Refresh Tasks"
-      },
-      {
-        "command": "ylate.pauseResume",
-        "title": "Ylate: Pause / Resume Timer",
-        "icon": "$(debug-pause)"
-      },
-      {
-        "command": "ylate.stopTimer",
-        "title": "Ylate: Stop Timer",
-        "icon": "$(debug-stop)"
-      },
-      {
-        "command": "ylate.startCustom",
-        "title": "Ylate: Track Custom Task"
-      },
-      {
-        "command": "ylate.showPanel",
-        "title": "Ylate: Open Tracker Panel"
-      },
-      {
-        "command": "ylate.statusBarMenu",
-        "title": "Ylate: Status Bar Menu"
-      }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "ylate.pauseResume"
-        },
-        {
-          "command": "ylate.stopTimer"
-        },
-        {
-          "command": "ylate.startCustom"
-        },
-        {
-          "command": "ylate.showPanel"
-        },
-        {
-          "command": "ylate.statusBarMenu",
-          "when": "false"
-        }
-      ]
-    },
-    "configuration": {
-      "title": "Ylate",
-      "properties": {
-        "youtrackTracker.baseUrl": {
-          "type": "string",
-          "default": "",
-          "description": "YouTrack base URL (e.g. https://yourcompany.youtrack.cloud)"
-        },
-        "youtrackTracker.token": {
-          "type": "string",
-          "default": "",
-          "description": "YouTrack permanent token"
-        },
-        "youtrackTracker.projectId": {
-          "type": "string",
-          "default": "",
-          "description": "YouTrack project short name (e.g. PROJ)"
-        },
-        "youtrackTracker.myIssuesOnly": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show only issues assigned to me"
-        }
-      }
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "youtrack-tracker",
-          "title": "Ylate",
-          "icon": "resources/icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "youtrack-tracker": [
-        {
-          "id": "youtrackTasks",
-          "name": "Tasks",
-          "type": "webview"
-        }
-      ]
-    }
-  },
+  "name": "ylate-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ylate — YouTrack time tracker. Monorepo root.",
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "vscode:prepublish": "npm run compile"
+    "build": "turbo run build",
+    "compile": "turbo run build",
+    "watch": "turbo run watch",
+    "package": "turbo run package",
+    "install:vscode": "turbo run install:vscode"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0",
-    "typescript": "^5.3.0"
-  }
+    "turbo": "^2.3.0"
+  },
+  "packageManager": "pnpm@11.1.3"
 }

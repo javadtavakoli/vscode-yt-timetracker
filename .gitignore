@@ -1,8 +1,10 @@
 node_modules
 out/
+dist/
 *.vsix
 *.tsbuildinfo
 .vscode-test/
+.turbo/
 
 # editor / OS
 .DS_Store

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "outputs": ["out/**", "dist/**"]
+    },
+    "watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "package": {
+      "dependsOn": ["build"],
+      "outputs": ["*.vsix"]
+    },
+    "install:vscode": {
+      "dependsOn": ["package"],
+      "cache": false
+    }
+  }
+}
