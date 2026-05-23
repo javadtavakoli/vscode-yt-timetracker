@@ -90,6 +90,8 @@ export type HostMessage =
       elapsedMs: number;
       connected: boolean;
       errorMsg: string;
+      /** YouTrack base URL — used by the UI to build per-issue deep links. */
+      baseUrl: string;
     }
   | {
       type: "timerUpdate";
@@ -114,6 +116,7 @@ export type UICommand =
   | { cmd: "refresh" }
   | { cmd: "configure" }
   | { cmd: "move"; issueId: string; state: string }
+  | { cmd: "openExternal"; url: string }
   | { cmd: "getConfig" }
   | {
       cmd: "saveConfig";

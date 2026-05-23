@@ -74,6 +74,8 @@ input, select, textarea { color-scheme: dark; }
 .issue-card.running { border-color: var(--green); }
 .issue-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .issue-id { font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 600; color: var(--accent); }
+button.issue-id-link { background: transparent; border: none; padding: 0; cursor: pointer; font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 600; color: var(--accent); }
+button.issue-id-link:hover { text-decoration: underline; color: #6fa3ff; }
 .issue-state-badge { font-size: 10px; padding: 1px 7px; border-radius: 20px; background: var(--surface2); color: var(--muted); margin-left: auto; }
 .issue-summary { font-size: 12px; color: var(--text); margin-bottom: 6px; line-height: 1.4; }
 .issue-spent { font-size: 10px; color: var(--muted); margin-bottom: 6px; }

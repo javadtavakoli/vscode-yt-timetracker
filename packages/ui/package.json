@@ -15,6 +15,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-http": "^2.1.0",
+    "@tauri-apps/plugin-opener": "^2.2.0",
     "@tauri-apps/plugin-store": "^2.1.0",
     "@ylate/core": "workspace:*",
     "react": "^18.3.1",

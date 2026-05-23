@@ -12,6 +12,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Store } from "@tauri-apps/plugin-store";
 import { getDesktopTransport } from "./api";
 
@@ -125,17 +126,28 @@ export async function bootstrapDesktopHost(): Promise<void> {
       elapsedMs: core.totalElapsedMs,
       connected,
       errorMsg,
+      baseUrl: config.baseUrl,
     });
   }
 
+  // Tray text only changes once per *minute* (we truncate to minutes), so
+  // calling the Rust IPC every second is wasted work — on Linux it churns
+  // GTK + libayatana-appindicator and contributes to occasional UI freezes.
+  // Cache the last sent value and only invoke on change.
+  let lastTrayText = "";
   function sendTimerUpdate(): void {
     transport.deliverToUI({
       type: "timerUpdate",
       session: core.session,
       elapsedMs: core.totalElapsedMs,
     });
-    void invoke("set_tray_text", { text: formatTrayLine(core.session, core.displayMs) })
-      .catch(() => {/* tray may not be ready yet */});
+    const text = formatTrayLine(core.session, core.displayMs);
+    if (text !== lastTrayText) {
+      lastTrayText = text;
+      void invoke("set_tray_text", { text }).catch(() => {
+        /* tray may not be ready yet */
+      });
+    }
   }
 
   core.onUpdate(sendTimerUpdate);
@@ -298,6 +310,15 @@ export async function bootstrapDesktopHost(): Promise<void> {
         } catch (err) {
           errorMsg = `Failed to move issue: ${err}`;
           sendInit();
+        }
+        break;
+      case "openExternal":
+        if (cmd.url) {
+          try {
+            await openUrl(cmd.url);
+          } catch {
+            /* user's default handler will surface the error */
+          }
         }
         break;
     }

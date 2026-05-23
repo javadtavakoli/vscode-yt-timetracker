@@ -70,6 +70,7 @@ export function App() {
   const [serverSyncAt, setServerSyncAt] = useState(Date.now());
   const [connected, setConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
 
   const [search, setSearch] = useState("");
   const [customName, setCustomName] = useState("");
@@ -105,6 +106,7 @@ export function App() {
         setServerSyncAt(Date.now());
         setConnected(msg.connected);
         setErrorMsg(msg.errorMsg);
+        setBaseUrl(msg.baseUrl);
       } else if (msg.type === "timerUpdate") {
         setSession(msg.session);
         setServerElapsedMs(msg.elapsedMs);
@@ -172,6 +174,11 @@ export function App() {
   };
   const moveIssue = (issueId: string, state: string) =>
     post?.({ cmd: "move", issueId, state });
+  const openIssue = (issueReadable: string) => {
+    if (!baseUrl || !issueReadable) return;
+    const trimmed = baseUrl.replace(/\/$/, "");
+    post?.({ cmd: "openExternal", url: `${trimmed}/issue/${issueReadable}` });
+  };
   const savePreferences = (cfg: {
     baseUrl: string;
     token: string | undefined;
@@ -245,6 +252,9 @@ export function App() {
               onStart={() => startIssue(issue)}
               onStop={stopTimer}
               onMove={(state) => moveIssue(issue.id, state)}
+              onOpenInYouTrack={
+                baseUrl ? () => openIssue(issue.idReadable) : undefined
+              }
             />
           ))
         )}
@@ -388,6 +398,7 @@ function IssueCard({
   onStart,
   onStop,
   onMove,
+  onOpenInYouTrack,
 }: {
   issue: Issue;
   isRunning: boolean;
@@ -398,6 +409,7 @@ function IssueCard({
   onStart: () => void;
   onStop: () => void;
   onMove: (newState: string) => void;
+  onOpenInYouTrack?: () => void;
 }) {
   const spent = issue.spentTime
     ? `⏱ ${Math.floor(issue.spentTime / 60)}h ${issue.spentTime % 60}m spent`
@@ -427,7 +439,18 @@ function IssueCard({
   return (
     <div className={`issue-card${isRunning ? " running" : ""}`}>
       <div className="issue-top">
-        <span className="issue-id">{issue.idReadable}</span>
+        {onOpenInYouTrack ? (
+          <button
+            type="button"
+            className="issue-id issue-id-link"
+            onClick={onOpenInYouTrack}
+            title="Open in YouTrack"
+          >
+            {issue.idReadable} ↗
+          </button>
+        ) : (
+          <span className="issue-id">{issue.idReadable}</span>
+        )}
         {isRunning && (
           <span className="badge-running">
             <span className="pulse" />

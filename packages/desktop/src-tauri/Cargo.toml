@@ -22,6 +22,9 @@ tauri-plugin-autostart = "2"
 # Runs HTTP requests through Rust (reqwest) instead of the webview, so
 # YouTrack API calls don't get blocked by WebKit2GTK's CORS policy on Linux.
 tauri-plugin-http = "2"
+# Opens URLs (and files) in the user's default browser / handler. Used by
+# the renderer to deep-link issue IDs back to YouTrack.
+tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # OS-native keychain for the YouTrack token: macOS Keychain, Windows

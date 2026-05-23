@@ -107,6 +107,11 @@ class TrackerWebviewProvider implements vscode.WebviewViewProvider {
         case "move":
           await moveIssue(msg.issueId, msg.state);
           break;
+        case "openExternal":
+          if (typeof msg.url === "string" && msg.url) {
+            vscode.env.openExternal(vscode.Uri.parse(msg.url));
+          }
+          break;
       }
     });
 
@@ -119,6 +124,7 @@ class TrackerWebviewProvider implements vscode.WebviewViewProvider {
 // Send full state: issues list + timer
 function sendAll() {
   if (!webviewView) return;
+  const cfg = vscode.workspace.getConfiguration("youtrackTracker");
   webviewView.webview.postMessage({
     type: "init",
     issues,
@@ -128,6 +134,7 @@ function sendAll() {
     elapsedMs: timerManager.totalElapsedMs,
     connected,
     errorMsg,
+    baseUrl: cfg.get<string>("baseUrl", ""),
   });
 }
 
