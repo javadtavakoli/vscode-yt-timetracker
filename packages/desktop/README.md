@@ -12,11 +12,11 @@ Ylate as a native Tauri 2 app for Windows, macOS, and Linux. Loads the same `@yl
     ```bash
     sudo apt install \
       libwebkit2gtk-4.1-dev \
-      build-essential curl wget file \
+      build-essential curl wget file pkg-config \
       libxdo-dev libssl-dev \
       libayatana-appindicator3-dev \
       librsvg2-dev \
-      libsecret-1-dev          # for the keychain-backed YouTrack token
+      libsecret-1-dev libdbus-1-dev   # keychain-backed YouTrack token
     ```
   - **macOS:** Xcode Command Line Tools (`xcode-select --install`)
   - **Windows:** Microsoft C++ Build Tools and WebView2 (preinstalled on Windows 10/11)
