@@ -140,7 +140,13 @@ jobs:
       - name: Build & upload (tauri-action)
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer the repo-level PAT (fine-grained, scoped to actions +
+          # contents + releases). The default GITHUB_TOKEN is gated by the
+          # "Workflow permissions" repo setting which can 403 release
+          # creation even with `permissions: contents: write` in YAML.
+          # Falls back to GITHUB_TOKEN if PAT is absent so contributors
+          # forking the repo aren't blocked.
+          GITHUB_TOKEN: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
         with:
           projectPath: packages/desktop
           # Only create / update the GH Release when triggered by a tag push.
