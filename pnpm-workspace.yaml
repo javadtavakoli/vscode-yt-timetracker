@@ -2,15 +2,12 @@ packages:
   - 'packages/*'
 
 allowBuilds:
-  '@vscode/vsce-sign': set this to true or false
-  keytar: set this to true or false
+  esbuild: set this to true or false
 
-# Postinstall scripts for these are unnecessary for our packaging flow.
-# - @vscode/vsce-sign: only used when signing extensions (we don't yet).
-# - keytar: native keychain bindings used by `vsce login`; opt-in later if
-#   we want to publish from this machine.
-# Listing them here tells pnpm we are deliberately skipping their build
-# scripts so the install warning is not escalated to an error.
-ignoredBuiltDependencies:
-  - '@vscode/vsce-sign'
-  - keytar
+# Only the packages listed here may run their postinstall scripts. esbuild
+# needs to download its native binary on install; everything else (vsce-sign,
+# keytar) is skipped silently — keytar's keychain bindings will be opt-in when
+# we wire up `vsce login`, vsce-sign is only used for signed extensions which
+# we don't do yet.
+onlyBuiltDependencies:
+  - esbuild

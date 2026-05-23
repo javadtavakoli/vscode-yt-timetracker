@@ -34,7 +34,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -133,13 +133,20 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "vscode:prepublish": "npm run compile"
+    "typecheck": "tsc -p ./ --noEmit",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --target=node18 --sourcemap",
+    "build": "pnpm typecheck && pnpm bundle",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --target=node18 --sourcemap --watch",
+    "package": "vsce package --no-dependencies --allow-missing-repository",
+    "install:vscode": "code --install-extension ylate-*.vsix --force",
+    "vscode:prepublish": "pnpm build"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "@ylate/core": "workspace:*",
+    "esbuild": "^0.24.0",
     "typescript": "^5.3.0"
   }
 }

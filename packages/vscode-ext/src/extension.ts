@@ -1,12 +1,17 @@
 import * as vscode from "vscode";
-import { YouTrackClient, YTIssue } from "./youtrackClient";
-import { TimerManager, ActivityType } from "./timerManager";
+import {
+  YouTrackClient,
+  type Issue,
+  type ActivityType,
+  type BoardColumn,
+} from "@ylate/core";
+import { TimerManager } from "./timerManager";
 import { getPanelHtml } from "./panelHtml";
 
 let client: YouTrackClient | null = null;
-let issues: YTIssue[] = [];
+let issues: Issue[] = [];
 let states: string[] = [];
-let boardColumns: { presentation: string; fieldValues: string[] }[] | null = null;
+let boardColumns: BoardColumn[] | null = null;
 let timerManager: TimerManager;
 let webviewView: vscode.WebviewView | undefined;
 let connected = false;
