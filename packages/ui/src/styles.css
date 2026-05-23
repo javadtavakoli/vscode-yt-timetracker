@@ -58,7 +58,15 @@ button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
 input, select { width: 100%; padding: 6px 9px; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-family: "Inter", sans-serif; font-size: 12px; outline: none; transition: border-color .15s; margin-bottom: 6px; }
 input:focus, select:focus { border-color: var(--accent); }
 input::placeholder { color: var(--muted); }
-select option { background: var(--surface2); }
+/* The native option dropdown ignores `color`/`background` set on .select
+ * itself in most engines (WebKit2GTK in particular) — set them on the
+ * option element directly so the dropdown is readable on system dark themes
+ * (Ubuntu's GTK dark variant otherwise renders dark text on white). */
+select option { background: var(--surface2); color: var(--text); }
+select option:checked { background: var(--accent); color: #fff; }
+/* Same story on the standalone <input>s — force the explicit color scheme so
+ * GTK doesn't theme them with white-on-white. */
+input, select, textarea { color-scheme: dark; }
 
 .issues-list { display: flex; flex-direction: column; gap: 6px; }
 .issue-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s; }

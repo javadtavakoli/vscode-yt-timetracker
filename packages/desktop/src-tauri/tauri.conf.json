@@ -30,7 +30,7 @@
     "trayIcon": {
       "id": "main",
       "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
+      "iconAsTemplate": false,
       "title": "Ylate",
       "tooltip": "Ylate"
     }

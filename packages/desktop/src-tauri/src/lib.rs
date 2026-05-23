@@ -5,14 +5,28 @@ use tauri::{
 };
 use tauri_plugin_autostart::MacosLauncher;
 
-/// Sets the inline title text on macOS (visible in the menu bar) and the
-/// tooltip on Windows/Linux (visible on hover). The renderer calls this every
-/// second while a timer runs.
+/// Sets the inline title text on macOS (visible in the menu bar), the
+/// tooltip on Windows/Linux (visible on hover), AND the main window title
+/// (visible in the OS taskbar / window switcher / GNOME activity overview).
+/// The renderer calls this every second while a timer runs.
+///
+/// The window-title path is the only one that actually puts the running
+/// timer in a *visible* place on Linux without hovering — most Linux trays
+/// (and especially GNOME's AppIndicator fallback) don't display the inline
+/// title text, so the taskbar entry is our best surface there.
 #[tauri::command]
 fn set_tray_text(app: AppHandle, text: String) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_title(Some(text.clone()));
-        let _ = tray.set_tooltip(Some(text));
+        let _ = tray.set_tooltip(Some(text.clone()));
+    }
+    if let Some(win) = app.get_webview_window("main") {
+        let title = if text == "Ylate" {
+            "Ylate".to_string()
+        } else {
+            format!("Ylate — {}", text)
+        };
+        let _ = win.set_title(&title);
     }
     Ok(())
 }

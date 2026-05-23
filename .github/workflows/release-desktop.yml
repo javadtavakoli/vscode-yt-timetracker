@@ -79,6 +79,40 @@ jobs:
         #     `keyring` crate for keychain access
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Sync version from tag
+        # `desktop-v0.1.1` → write 0.1.1 into the three places that drive the
+        # bundled installer's version string. Without this step, tagging
+        # desktop-v0.1.1 still produces 0.1.0 installers because the source
+        # files weren't touched.
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          echo "Setting desktop version to $VERSION"
+          node -e "
+            const fs = require('fs');
+            const v = process.argv[1];
+            // tauri.conf.json
+            const confPath = 'packages/desktop/src-tauri/tauri.conf.json';
+            const conf = JSON.parse(fs.readFileSync(confPath, 'utf8'));
+            conf.version = v;
+            fs.writeFileSync(confPath, JSON.stringify(conf, null, 2) + '\n');
+            // package.json
+            const pkgPath = 'packages/desktop/package.json';
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            pkg.version = v;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+            // Cargo.toml — only the first [package].version line
+            const cargoPath = 'packages/desktop/src-tauri/Cargo.toml';
+            const cargo = fs.readFileSync(cargoPath, 'utf8');
+            fs.writeFileSync(cargoPath, cargo.replace(/^version\s*=\s*\".*\"/m, 'version = \"' + v + '\"'));
+            console.log('Wrote ' + v + ' into all three desktop version fields.');
+          " "$VERSION"
+          echo "--- After update:"
+          grep '"version"' packages/desktop/package.json | head -1
+          grep '"version"' packages/desktop/src-tauri/tauri.conf.json | head -1
+          grep '^version' packages/desktop/src-tauri/Cargo.toml | head -1
+
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
