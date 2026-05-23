@@ -3,11 +3,12 @@ src-tauri/target/
 src-tauri/gen/
 # Cargo.lock IS committed for binary crates (this one) — do not gitignore
 
-# Generated icon sets (run `pnpm icons` to regenerate)
-src-tauri/icons/32x32.png
-src-tauri/icons/128x128@2x.png
-src-tauri/icons/icon.icns
-src-tauri/icons/icon.ico
+# Mobile icon sets (we don't build Android/iOS yet — `pnpm icons` generates
+# them but they're noise in this repo).
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png
 
 # Build output
 dist/
