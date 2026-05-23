@@ -1,13 +1,23 @@
 packages:
   - 'packages/*'
 
-allowBuilds:
-  esbuild: set this to true or false
-
-# Only the packages listed here may run their postinstall scripts. esbuild
-# needs to download its native binary on install; everything else (vsce-sign,
-# keytar) is skipped silently — keytar's keychain bindings will be opt-in when
-# we wire up `vsce login`, vsce-sign is only used for signed extensions which
-# we don't do yet.
+# `onlyBuiltDependencies` is the allowlist of packages whose postinstall
+# scripts MAY run. esbuild downloads its native binary in postinstall, so it
+# must be here or our builds break.
 onlyBuiltDependencies:
   - esbuild
+
+# `ignoredBuiltDependencies` is the explicit "we know about these, please
+# don't warn / don't escalate to a non-zero exit code" list. pnpm 11 fails
+# CI installs otherwise — locally `.npmrc`'s `verify-deps-before-run=false`
+# papered over this for `pnpm run`, but `pnpm install` needs the explicit
+# acknowledgement.
+#
+# - @vscode/vsce-sign: only used when signing extensions (we don't yet).
+# - keytar:            native keychain bindings used by `vsce login`. The
+#                      desktop app uses the `keyring` Rust crate instead —
+#                      this JS keytar comes in transitively via vsce and
+#                      we don't need it.
+ignoredBuiltDependencies:
+  - '@vscode/vsce-sign'
+  - keytar
