@@ -6,6 +6,8 @@ export type {
   BoardColumn,
   Project,
   FrozenInfo,
+  HostMessage,
+  UICommand,
 } from "./types";
 
 export type { SessionStorage } from "./storage";

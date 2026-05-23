@@ -6,7 +6,7 @@ import {
   type BoardColumn,
 } from "@ylate/core";
 import { TimerManager } from "./timerManager";
-import { getPanelHtml } from "./panelHtml";
+import panelHtml from "@ylate/ui";
 
 let client: YouTrackClient | null = null;
 let issues: Issue[] = [];
@@ -72,8 +72,10 @@ class TrackerWebviewProvider implements vscode.WebviewViewProvider {
     webviewView = view;
     view.webview.options = { enableScripts: true };
 
-    // Set the static HTML shell ONCE - never replace it again
-    view.webview.html = getPanelHtml(view.webview);
+    // Set the static HTML shell ONCE - never replace it again.
+    // The bundled React UI lives in @ylate/ui and is inlined at esbuild time
+    // via the .html text loader, so no separate resource files ship in the .vsix.
+    view.webview.html = panelHtml;
 
     view.webview.onDidReceiveMessage(async (msg) => {
       switch (msg.cmd) {

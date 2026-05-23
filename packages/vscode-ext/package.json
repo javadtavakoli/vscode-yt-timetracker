@@ -134,9 +134,9 @@
   },
   "scripts": {
     "typecheck": "tsc -p ./ --noEmit",
-    "bundle": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --target=node18 --sourcemap",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --target=node18 --sourcemap --loader:.html=text",
     "build": "pnpm typecheck && pnpm bundle",
-    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --target=node18 --sourcemap --watch",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --target=node18 --sourcemap --loader:.html=text --watch",
     "package": "vsce package --no-dependencies --allow-missing-repository",
     "install:vscode": "code --install-extension ylate-*.vsix --force",
     "vscode:prepublish": "pnpm build"
@@ -146,6 +146,7 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.0.0",
     "@ylate/core": "workspace:*",
+    "@ylate/ui": "workspace:*",
     "esbuild": "^0.24.0",
     "typescript": "^5.3.0"
   }

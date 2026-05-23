@@ -6,16 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **pnpm + Turbo monorepo**.
 
-- [`packages/core`](packages/core) — `@ylate/core`. Pure timer state machine + YouTrack HTTP client + shared types. No VS Code, no DOM, no `setInterval`. Runs in Node, browsers, Electron, and Tauri.
-- [`packages/vscode-ext`](packages/vscode-ext) — the VS Code extension (`JavadTavakoli.ylate`). Thin host shell over `@ylate/core`.
-- Planned (see [docs/plan-desktop.md](docs/plan-desktop.md)): `packages/ui`, `packages/desktop` (Tauri).
+- [`packages/core`](packages/core) — `@ylate/core`. Pure timer state machine + YouTrack HTTP client + shared types + host↔UI message contract. No VS Code, no DOM, no `setInterval`. Runs in Node, browsers, Electron, and Tauri.
+- [`packages/ui`](packages/ui) — `@ylate/ui`. React + Vite panel UI, built to a single self-contained HTML (`vite-plugin-singlefile`). Loaded by VS Code's webview today and Tauri's renderer in Phase 3.
+- [`packages/vscode-ext`](packages/vscode-ext) — the VS Code extension (`JavadTavakoli.ylate`). Thin host shell over `@ylate/core`; inlines `@ylate/ui`'s HTML at bundle time via esbuild's `--loader:.html=text`.
+- Planned (see [docs/plan-desktop.md](docs/plan-desktop.md)): `packages/desktop` (Tauri).
 
 ## Commands
 
 ```bash
 pnpm install                                          # one-time, hydrates all workspaces
-pnpm build                                            # turbo build across all packages
+pnpm build                                            # turbo build across all packages — IMPORTANT, see warning below
 pnpm --filter @ylate/core build                       # build core only → packages/core/dist/
+pnpm --filter @ylate/ui build                         # build UI only → packages/ui/dist/index.html
 pnpm --filter ylate build                             # typecheck + esbuild bundle → packages/vscode-ext/dist/extension.js
 pnpm --filter ylate watch                             # esbuild --watch (re-bundle on save)
 pnpm --filter ylate package                           # produce ylate-<version>.vsix
@@ -24,7 +26,13 @@ code --install-extension packages/vscode-ext/ylate-<version>.vsix --force
 
 There is no test suite and no linter. TypeScript `strict` is on; the typecheck step in `vscode-ext`'s build script runs `tsc --noEmit`. esbuild is what actually emits the runtime bundle.
 
-To exercise the extension after a code change: `pnpm --filter ylate package && code --install-extension packages/vscode-ext/ylate-*.vsix --force`, then **Developer: Reload Window**.
+**Build a fresh `.vsix` with all UI changes:** the `vscode-ext` package script does NOT re-run upstream package builds — running `pnpm --filter ylate build` after editing `packages/ui/src/*.tsx` will silently inline the *stale* `packages/ui/dist/index.html`. Either run `pnpm build` from the repo root (Turbo orchestrates the order) or chain the upstream builds explicitly:
+
+```bash
+pnpm build && pnpm --filter ylate package          # safest one-liner
+# or:
+pnpm --filter @ylate/ui build && pnpm --filter ylate package
+```
 
 **pnpm 11 quirk:** [.npmrc](.npmrc) sets `verify-deps-before-run=false` because pnpm's default escalates the `IGNORED_BUILDS` warning into a hard failure on every `pnpm run` invocation. [pnpm-workspace.yaml](pnpm-workspace.yaml) lists `esbuild` under `onlyBuiltDependencies` so its native-binary postinstall actually runs; everything else (vsce-sign, keytar) is silently skipped. Don't undo these without understanding the failure mode.
 
@@ -41,23 +49,37 @@ To exercise the extension after a code change: `pnpm --filter ylate package && c
 
 [`packages/core/src/youtrackClient.ts`](packages/core/src/youtrackClient.ts) uses the global `fetch` (Node ≥ 18, browsers, Tauri webview — one impl everywhere). Issue conversion lives in `mapIssue()`. **Adding a new visible field still means extending both the `fields=` query string and `mapIssue` in lockstep** — forgetting the query string silently returns empty values.
 
+### `packages/ui` — the React panel
+
+Single Vite app, single self-contained HTML output (`vite-plugin-singlefile`). 155 KB raw, ~50 KB gzipped — React + DOM-side code + CSS all inlined into one `dist/index.html`.
+
+- [`src/main.tsx`](packages/ui/src/main.tsx) is the React entry. Renders `<App/>` into `#root`.
+- [`src/App.tsx`](packages/ui/src/App.tsx) is the whole panel: `Header`, `TimerCard`, `CustomTaskForm`, `IssueCard` — kept inline as small function components. Promote one out only when it grows or starts being reused.
+- [`src/api.ts`](packages/ui/src/api.ts) is the **host-transport abstraction**. Detects `acquireVsCodeApi()` (VS Code webview) and returns a `Transport { post, onMessage }`. The Tauri branch will be added in Phase 3 — don't put platform-specific code in components.
+- [`src/styles.css`](packages/ui/src/styles.css) is the CSS (CSS variables, no preprocessor). Imported once from `main.tsx`; Vite bundles + inlines it.
+
+**The per-second tick that drives the timer display lives in `App.tsx`** as a `useEffect` + `setInterval` that calls `setNowTick`. It is **deliberately not memoized** — `computeDisplayMs(...)` is a plain function called inline in JSX so `Date.now()` re-evaluates on every render. Wrapping it in `useMemo` would freeze the timer because the deps wouldn't change between ticks. Found this the hard way in Phase 2.
+
 ### `packages/vscode-ext` — the VS Code shell
 
-Four source files. The non-obvious bits are the contracts between them.
+Three source files (plus a tiny type declaration). The non-obvious bits are the contracts between them.
 
-**[`extension.ts`](packages/vscode-ext/src/extension.ts) — host-side controller.** Activates on `onStartupFinished`, owns module-level state (`client`, `issues`, `states`, `boardColumns`, `connected`, `errorMsg`), registers commands, provides the webview view, and orchestrates connect / refresh / move. Doesn't render — pushes state to the webview and reads from `timerManager`.
+**[`extension.ts`](packages/vscode-ext/src/extension.ts) — host-side controller.** Activates on `onStartupFinished`, owns module-level state (`client`, `issues`, `states`, `boardColumns`, `connected`, `errorMsg`), registers commands, provides the webview view, and orchestrates connect / refresh / move. The webview body comes from `import panelHtml from "@ylate/ui"` — esbuild inlines the HTML string at bundle time via `--loader:.html=text`, so no separate resource files ship in the `.vsix`.
 
-**[`timerManager.ts`](packages/vscode-ext/src/timerManager.ts) — thin shell around `TimerCore`.** Owns the `StatusBarItem`, the 1-second `setInterval` ticker, the toasts ("✅ Logged …", "⏸ Paused …"), and a `WorkspaceStateStorage` adapter. Public API surface (`start`, `pause`, `togglePause`, `stopAndLog`, `current`, `totalElapsedMs`, `onUpdate`, `onLogged`) is compatible with the pre-Phase-1 class so callers in `extension.ts` are unchanged. **Session state lives inside `TimerCore`, not here — don't add session fields to this class.**
+**[`timerManager.ts`](packages/vscode-ext/src/timerManager.ts) — thin shell around `TimerCore`.** Owns the `StatusBarItem`, the 1-second `setInterval` ticker, the toasts ("✅ Logged …", "⏸ Paused …"), and a `WorkspaceStateStorage` adapter. Public API surface (`start`, `pause`, `togglePause`, `stopAndLog`, `current`, `totalElapsedMs`, `onUpdate`, `onLogged`) is preserved so callers in `extension.ts` don't churn. **Session state lives inside `TimerCore`, not here — don't add session fields to this class.**
 
 **[`storage.ts`](packages/vscode-ext/src/storage.ts) — `WorkspaceStateStorage`.** Wraps `vscode.Memento` to implement the `SessionStorage` interface from core. Update is async on the VS Code side but fire-and-forget here; the contract is sync.
 
-**[`panelHtml.ts`](packages/vscode-ext/src/panelHtml.ts) — webview body.** Returns a single self-contained HTML string with CSS and JS inline. Communicates with the host through `vscode.postMessage` / `acquireVsCodeApi()`.
+**[`ui-html.d.ts`](packages/vscode-ext/src/ui-html.d.ts)** — module declaration so TypeScript accepts `import panelHtml from "@ylate/ui"` as a string. The actual loading is done by esbuild at build time.
 
 ### Build pipeline
 
-`vscode-ext` is bundled with **esbuild**, not tsc — `@ylate/core` is a workspace package and the published `.vsix` uses `--no-dependencies`, so the core code has to be inlined into a single `dist/extension.js`. tsc is used only for typechecking (`--noEmit`).
+`vscode-ext` is bundled with **esbuild**, not tsc. Two reasons:
 
-Turbo's `dependsOn: ["^build"]` ensures `@ylate/core` builds before `vscode-ext` reads `dist/index.js` for type resolution.
+1. `@ylate/core` is a workspace package; the published `.vsix` uses `--no-dependencies`, so the core code has to be inlined into a single `dist/extension.js`.
+2. `@ylate/ui`'s `main` is `./dist/index.html`. esbuild's `--loader:.html=text` reads that file as a string at bundle time and inlines it.
+
+tsc is used only for typechecking (`--noEmit`). Turbo's `dependsOn: ["^build"]` ensures `@ylate/core` and `@ylate/ui` build before `vscode-ext`. **Direct `pnpm --filter ylate build` does not re-run upstream builds** — see the Commands section above.
 
 ### Webview contract — "static shell + postMessage"
 
@@ -68,9 +90,9 @@ The webview HTML is set **exactly once**, in `resolveWebviewView`. After that, t
 
 The webview's `'ready'` message is the handshake — the host doesn't know the webview exists until that arrives, so initial state is pushed in response to `'ready'`, not at activation time.
 
-### Event delegation in the webview is non-negotiable
+### (Historical) Event delegation footgun
 
-Issue card actions (Start, Stop, state-change dropdown) use `data-action` / `data-issue-id` attributes plus delegated listeners on `#issuesList`. Do **not** introduce inline `onclick="…"` handlers that interpolate `issue.id` — earlier code did `onclick="startIssue(' + JSON.stringify(issue.id) + ')"` which produced `onclick="startIssue("3-123")"`, and the inner `"` closed the attribute, silently breaking every Start button (and as a downstream effect, leaving the status bar permanently hidden because no session was ever created). If you need a new card-level action, add a `data-action` value and extend the delegated handlers in [`panelHtml.ts`](packages/vscode-ext/src/panelHtml.ts).
+Pre-Phase 2 the panel was a hand-rolled HTML string and a Start-button bug landed where the code did `onclick="startIssue(' + JSON.stringify(issue.id) + ')"`, producing `onclick="startIssue("3-123")"` — the inner `"` closed the attribute and every Start button silently broke (and the status bar stayed hidden as a downstream effect). React handlers in the new UI avoid this entirely; keep them as JSX callbacks (`onClick={() => startIssue(issue)}`), don't reach for `dangerouslySetInnerHTML` or hand-built HTML strings.
 
 ### Crash-resilient session persistence
 

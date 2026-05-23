@@ -59,3 +59,43 @@ export interface FrozenInfo {
   summary: string;
   gapMinutes: number;
 }
+
+/* ───────────────────────────── Host ↔ UI messages ───────────────────────────
+ * Both shells (VS Code webview + Tauri renderer) speak this protocol.
+ * `HostMessage` flows host → UI, `UICommand` flows UI → host.
+ * The transport is platform-specific (`vscode.postMessage` vs
+ * `@tauri-apps/api` events) but the wire shape is shared.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type HostMessage =
+  | {
+      type: "init";
+      issues: Issue[];
+      states: string[];
+      boardColumns: BoardColumn[] | null;
+      session: Session | null;
+      elapsedMs: number;
+      connected: boolean;
+      errorMsg: string;
+    }
+  | {
+      type: "timerUpdate";
+      session: Session | null;
+      elapsedMs: number;
+    };
+
+export type UICommand =
+  | { cmd: "ready" }
+  | {
+      cmd: "start";
+      issueId: string;
+      issueReadable: string;
+      summary: string;
+      activity: ActivityType;
+    }
+  | { cmd: "startCustom"; summary: string; activity: ActivityType }
+  | { cmd: "pauseResume" }
+  | { cmd: "stop" }
+  | { cmd: "refresh" }
+  | { cmd: "configure" }
+  | { cmd: "move"; issueId: string; state: string };
