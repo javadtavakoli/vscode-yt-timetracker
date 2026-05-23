@@ -58,9 +58,9 @@ jobs:
             libsecret-1-dev
 
       - name: Set up pnpm
+        # Version comes from `packageManager` in the root package.json —
+        # don't specify it here, pnpm/action-setup@v4 errors on duplicates.
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
