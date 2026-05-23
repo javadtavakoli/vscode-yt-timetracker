@@ -27,6 +27,14 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.label }}
+    # Repeated here in addition to the workflow-level `permissions:` block.
+    # Both are needed: the top-level grants permissions to the workflow, the
+    # job-level overrides any defaults the repo's Actions settings impose.
+    # Without this *and* the repo setting "Read and write permissions"
+    # toggled on, release creation 403s with "Resource not accessible by
+    # integration".
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
