@@ -78,6 +78,9 @@ jobs:
           cache: pnpm
 
       - name: Install JS dependencies
+        # bash on all three runners so the `[]` arg quoting below is uniform
+        # (Windows would otherwise default to pwsh).
+        shell: bash
         # --ignore-scripts because pnpm 11 escalates IGNORED_BUILDS to a hard
         # error in CI (the local TTY path just prints a warning). None of the
         # postinstall scripts in our tree are required:
@@ -85,7 +88,15 @@ jobs:
         #   * @vscode/vsce-sign is only used for signed extensions
         #   * keytar comes transitively via vsce; desktop uses the Rust
         #     `keyring` crate for keychain access
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        #
+        # `--config.minimumReleaseAgeExclude[]=trackpilot` exempts our own
+        # first-party package from the runner's minimum-release-age supply-chain
+        # gate, so a freshly-published trackpilot version doesn't block the
+        # release build. The gate still applies to every third-party dep. The
+        # `pnpm-workspace.yaml` exclude isn't honored when the age threshold
+        # comes from the runner's global config, so it's set inline (CLI =
+        # highest precedence).
+        run: pnpm install --frozen-lockfile --ignore-scripts "--config.minimumReleaseAgeExclude[]=trackpilot"
 
       - name: Sync version from tag
         # `desktop-v0.1.1` → write 0.1.1 into the three places that drive the
