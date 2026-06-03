@@ -2,7 +2,7 @@
   "name": "ylate",
   "displayName": "Ylate",
   "description": "Track time on YouTrack tasks with activity types, column management, and status bar integration",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "publisher": "JavadTavakoli",
   "author": {
     "name": "Javad Tavakoli",
