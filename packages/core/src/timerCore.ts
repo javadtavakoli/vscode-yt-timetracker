@@ -1,4 +1,4 @@
-import type { Session, ActivityType, LogParams, FrozenInfo } from "./types";
+import type { Session, LogParams, FrozenInfo } from "./types";
 import type { SessionStorage } from "./storage";
 
 export type UpdateListener = () => void;
@@ -83,7 +83,7 @@ export class TimerCore {
     issueId: string | null,
     issueReadable: string,
     summary: string,
-    activity: ActivityType,
+    workItemType: string,
     priorSpentMinutes: number
   ): void {
     if (this._session) {
@@ -95,7 +95,7 @@ export class TimerCore {
       issueId,
       issueReadable,
       summary,
-      activity,
+      workItemType,
       startedAt: Date.now(),
       elapsed: 0,
       paused: false,
@@ -151,8 +151,9 @@ export class TimerCore {
         await this.logger({
           issueId: sess.issueId,
           minutes,
-          description: `[${sess.activity}] ${sess.summary}`,
+          description: sess.summary,
           startedAt: sess.startedAt,
+          type: sess.workItemType || undefined,
         });
         for (const l of this.loggedListeners) l(sess.issueId);
       } catch (err) {

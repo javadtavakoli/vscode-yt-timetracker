@@ -14,7 +14,7 @@
     "watch": "tsc -p ./ --watch"
   },
   "dependencies": {
-    "trackpilot": "^0.3.0"
+    "trackpilot": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

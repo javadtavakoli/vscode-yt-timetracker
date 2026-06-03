@@ -15,8 +15,8 @@ importers:
   packages/core:
     dependencies:
       trackpilot:
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -1989,8 +1989,8 @@ packages:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
     engines: {node: '>=8.0'}
 
-  trackpilot@0.3.0:
-    resolution: {integrity: sha512-OVVxIFMoo5EUsu4aEroK70ddVHjs2w1B6GbMUDO0j4Fn4Pr/mlKgtH9+3b+blJvJrrkzYq6gUeGjDg8Ayx6qjA==}
+  trackpilot@0.4.0:
+    resolution: {integrity: sha512-yuqCGAAS06bk1ufADxwv/dOaJFgDiXcG3LCZBb675p4z2aLKHNGJTpGGUDH8oXDm0YgsP+GLAlgs6l/deMnXMQ==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -4020,7 +4020,7 @@ snapshots:
     dependencies:
       is-number: 7.0.0
 
-  trackpilot@0.3.0:
+  trackpilot@0.4.0:
     dependencies:
       '@napi-rs/keyring': 1.3.0
 

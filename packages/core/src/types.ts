@@ -1,17 +1,11 @@
-export type ActivityType =
-  | "Implementing"
-  | "Investigating"
-  | "Testing"
-  | "Reviewing"
-  | "Other";
-
 export interface Session {
   /** YouTrack internal issue id (e.g. "3-1234"), or null for a custom task. */
   issueId: string | null;
   /** Human-readable id like "PROJ-12", empty string for custom tasks. */
   issueReadable: string;
   summary: string;
-  activity: ActivityType;
+  /** Selected work-item type NAME (from the instance), "" if none. */
+  workItemType: string;
   /** Epoch ms when the current running segment started. Updated on resume and
    * on every checkpoint. */
   startedAt: number;
@@ -30,23 +24,18 @@ export interface LogParams {
   minutes: number;
   description: string;
   startedAt: number;
+  /** Work-item type NAME, if one was selected. */
+  type?: string;
 }
 
 export interface Issue {
   id: string;
   idReadable: string;
   summary: string;
+  /** Current value of the board's move field (e.g. the State/Stage value). */
   state?: string;
   /** Spent time in minutes as reported by YouTrack. */
   spentTime?: number;
-}
-
-export interface BoardColumn {
-  /** Display name of the column on the agile board. */
-  presentation: string;
-  /** State field values that map to this column. When the user picks the
-   * column we set the issue's state to `fieldValues[0]`. */
-  fieldValues: string[];
 }
 
 export interface Project {
@@ -84,8 +73,9 @@ export type HostMessage =
   | {
       type: "init";
       issues: Issue[];
-      states: string[];
-      boardColumns: BoardColumn[] | null;
+      moveField: string;
+      moveValues: string[];
+      workItemTypes: string[];
       session: Session | null;
       elapsedMs: number;
       connected: boolean;
@@ -108,14 +98,14 @@ export type UICommand =
       issueId: string;
       issueReadable: string;
       summary: string;
-      activity: ActivityType;
+      workItemType: string;
     }
-  | { cmd: "startCustom"; summary: string; activity: ActivityType }
+  | { cmd: "startCustom"; summary: string; workItemType: string }
   | { cmd: "pauseResume" }
   | { cmd: "stop" }
   | { cmd: "refresh" }
   | { cmd: "configure" }
-  | { cmd: "move"; issueId: string; state: string }
+  | { cmd: "move"; issueId: string; value: string }
   | { cmd: "openExternal"; url: string }
   | { cmd: "getConfig" }
   | {

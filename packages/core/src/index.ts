@@ -1,9 +1,7 @@
 export type {
-  ActivityType,
   Session,
   LogParams,
   Issue,
-  BoardColumn,
   Project,
   FrozenInfo,
   HostMessage,
