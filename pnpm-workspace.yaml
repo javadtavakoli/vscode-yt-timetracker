@@ -28,7 +28,8 @@ allowBuilds:
   keytar: set this to true or false
   sharp: set this to true or false
 
+# trackpilot is the maintainer's own first-party package (auto-published from
+# their CI). Exclude it by name from the release-age gate so freshly-published
+# versions don't block installs; the gate still protects all third-party deps.
 minimumReleaseAgeExclude:
-  - trackpilot@0.3.0
-  - trackpilot@0.4.0
-  - trackpilot@0.5.0
+  - trackpilot
