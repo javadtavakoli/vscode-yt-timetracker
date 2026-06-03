@@ -6,22 +6,12 @@ import {
 } from "react";
 import type {
   AppConfig,
-  BoardColumn,
   HostMessage,
   Issue,
   Session,
-  ActivityType,
 } from "@ylate/core";
 import { getTransport, isTauri, type Transport } from "./api";
 import { PreferencesView } from "./PreferencesView";
-
-const ACTIVITIES: ActivityType[] = [
-  "Implementing",
-  "Investigating",
-  "Testing",
-  "Reviewing",
-  "Other",
-];
 
 /** Same Dd:Hh:MMm:SSs format as the host status bar. 1d = 8h working day. */
 function formatDhms(ms: number): string {
@@ -35,14 +25,6 @@ function formatDhms(ms: number): string {
   if (days) out += days + "d:";
   out += `${h}h:${String(m).padStart(2, "0")}m:${String(sec).padStart(2, "0")}s`;
   return out;
-}
-
-function columnForState(
-  state: string | undefined,
-  cols: BoardColumn[] | null
-): BoardColumn | null {
-  if (!cols || !state) return null;
-  return cols.find((c) => c.fieldValues.includes(state)) ?? null;
 }
 
 /** prior YouTrack spent + current session elapsed, in ms. */
@@ -63,8 +45,8 @@ export function App() {
   const transportRef = useRef<Transport | null>(null);
 
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [states, setStates] = useState<string[]>([]);
-  const [boardColumns, setBoardColumns] = useState<BoardColumn[] | null>(null);
+  const [moveValues, setMoveValues] = useState<string[]>([]);
+  const [workItemTypes, setWorkItemTypes] = useState<string[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [serverElapsedMs, setServerElapsedMs] = useState(0);
   const [serverSyncAt, setServerSyncAt] = useState(Date.now());
@@ -74,9 +56,9 @@ export function App() {
 
   const [search, setSearch] = useState("");
   const [customName, setCustomName] = useState("");
-  const [customActivity, setCustomActivity] = useState<ActivityType>("Implementing");
-  // Activity selection per issue (default "Implementing")
-  const [activityById, setActivityById] = useState<Record<string, ActivityType>>({});
+  const [customType, setCustomType] = useState<string>("");
+  // Work-item type selection per issue
+  const [typeById, setTypeById] = useState<Record<string, string>>({});
 
   // Preferences view state — only used in the desktop shell. VS Code keeps
   // its own native input-box flow on `configure`.
@@ -99,8 +81,9 @@ export function App() {
     const unsubscribe = transport.onMessage((msg: HostMessage) => {
       if (msg.type === "init") {
         setIssues(msg.issues);
-        setStates(msg.states);
-        setBoardColumns(msg.boardColumns);
+        setMoveValues(msg.moveValues);
+        setWorkItemTypes(msg.workItemTypes);
+        setCustomType((prev) => prev || msg.workItemTypes[0] || "");
         setSession(msg.session);
         setServerElapsedMs(msg.elapsedMs);
         setServerSyncAt(Date.now());
@@ -150,13 +133,13 @@ export function App() {
       issueId: issue.id,
       issueReadable: issue.idReadable,
       summary: issue.summary,
-      activity: activityById[issue.id] ?? "Implementing",
+      workItemType: typeById[issue.id] ?? workItemTypes[0] ?? "",
     });
   };
   const startCustom = () => {
     const summary = customName.trim();
     if (!summary) return;
-    post?.({ cmd: "startCustom", summary, activity: customActivity });
+    post?.({ cmd: "startCustom", summary, workItemType: customType });
     setCustomName("");
   };
   const pauseResume = () => post?.({ cmd: "pauseResume" });
@@ -172,8 +155,8 @@ export function App() {
       post?.({ cmd: "configure" });
     }
   };
-  const moveIssue = (issueId: string, state: string) =>
-    post?.({ cmd: "move", issueId, state });
+  const moveIssue = (issueId: string, value: string) =>
+    post?.({ cmd: "move", issueId, value });
   const openIssue = (issueReadable: string) => {
     if (!baseUrl || !issueReadable) return;
     const trimmed = baseUrl.replace(/\/$/, "");
@@ -214,9 +197,10 @@ export function App() {
 
       <CustomTaskForm
         name={customName}
-        activity={customActivity}
+        type={customType}
+        typeOptions={workItemTypes}
         onNameChange={setCustomName}
-        onActivityChange={setCustomActivity}
+        onTypeChange={setCustomType}
         onStart={startCustom}
       />
 
@@ -243,15 +227,15 @@ export function App() {
               key={issue.id}
               issue={issue}
               isRunning={session?.issueId === issue.id}
-              states={states}
-              boardColumns={boardColumns}
-              selectedActivity={activityById[issue.id] ?? "Implementing"}
-              onActivityChange={(act) =>
-                setActivityById((prev) => ({ ...prev, [issue.id]: act }))
+              moveValues={moveValues}
+              activityOptions={workItemTypes}
+              selectedType={typeById[issue.id] ?? workItemTypes[0] ?? ""}
+              onActivityChange={(t) =>
+                setTypeById((prev) => ({ ...prev, [issue.id]: t }))
               }
               onStart={() => startIssue(issue)}
               onStop={stopTimer}
-              onMove={(state) => moveIssue(issue.id, state)}
+              onMove={(value) => moveIssue(issue.id, value)}
               onOpenInYouTrack={
                 baseUrl ? () => openIssue(issue.idReadable) : undefined
               }
@@ -316,7 +300,7 @@ function TimerCard({
       <div className="timer-label">Now tracking</div>
       <div className="timer-issue">{session.issueReadable || "(custom)"}</div>
       <div className="timer-summary">{session.summary}</div>
-      <span className="timer-activity">{session.activity}</span>
+      <span className="timer-activity">{session.workItemType}</span>
       <div className={`timer-display ${session.paused ? "paused" : ""}`}>
         {formatDhms(displayMs)}
       </div>
@@ -334,15 +318,17 @@ function TimerCard({
 
 function CustomTaskForm({
   name,
-  activity,
+  type,
+  typeOptions,
   onNameChange,
-  onActivityChange,
+  onTypeChange,
   onStart,
 }: {
   name: string;
-  activity: ActivityType;
+  type: string;
+  typeOptions: string[];
   onNameChange: (v: string) => void;
-  onActivityChange: (v: ActivityType) => void;
+  onTypeChange: (v: string) => void;
   onStart: () => void;
 }) {
   return (
@@ -368,10 +354,10 @@ function CustomTaskForm({
             onChange={(e) => onNameChange(e.target.value)}
           />
           <select
-            value={activity}
-            onChange={(e) => onActivityChange(e.target.value as ActivityType)}
+            value={type}
+            onChange={(e) => onTypeChange(e.target.value)}
           >
-            {ACTIVITIES.map((a) => (
+            {typeOptions.map((a) => (
               <option key={a}>{a}</option>
             ))}
           </select>
@@ -391,9 +377,9 @@ function CustomTaskForm({
 function IssueCard({
   issue,
   isRunning,
-  states,
-  boardColumns,
-  selectedActivity,
+  moveValues,
+  activityOptions,
+  selectedType,
   onActivityChange,
   onStart,
   onStop,
@@ -402,39 +388,29 @@ function IssueCard({
 }: {
   issue: Issue;
   isRunning: boolean;
-  states: string[];
-  boardColumns: BoardColumn[] | null;
-  selectedActivity: ActivityType;
-  onActivityChange: (a: ActivityType) => void;
+  moveValues: string[];
+  activityOptions: string[];
+  selectedType: string;
+  onActivityChange: (a: string) => void;
   onStart: () => void;
   onStop: () => void;
-  onMove: (newState: string) => void;
+  onMove: (value: string) => void;
   onOpenInYouTrack?: () => void;
 }) {
   const spent = issue.spentTime
     ? `⏱ ${Math.floor(issue.spentTime / 60)}h ${issue.spentTime % 60}m spent`
     : null;
 
-  const currentColumn = columnForState(issue.state, boardColumns);
-  const badgeText = currentColumn?.presentation || issue.state || "—";
-
-  // State dropdown options. Prefer agile board columns when available.
-  let dropdownOptions: { value: string; label: string; selected: boolean }[];
-  if (boardColumns && boardColumns.length) {
-    dropdownOptions = boardColumns.map((c) => ({
-      value: c.fieldValues[0],
-      label: c.presentation,
-      selected: !!currentColumn && currentColumn.presentation === c.presentation,
-    }));
-  } else {
-    dropdownOptions = states.map((s) => ({
-      value: s,
-      label: s,
-      selected: s === issue.state,
-    }));
-  }
-  const selectedValue =
-    dropdownOptions.find((o) => o.selected)?.value ?? dropdownOptions[0]?.value ?? "";
+  const badgeText = issue.state || "—";
+  // Always include the issue's current value, even if it's not among the
+  // discovered move values (e.g. a resolved/archived state) — otherwise the
+  // controlled <select> would render blank.
+  const baseOptions = moveValues.map((v) => ({ value: v, label: v }));
+  const dropdownOptions =
+    issue.state && !moveValues.includes(issue.state)
+      ? [{ value: issue.state, label: issue.state }, ...baseOptions]
+      : baseOptions;
+  const selectedValue = issue.state ?? dropdownOptions[0]?.value ?? "";
 
   return (
     <div className={`issue-card${isRunning ? " running" : ""}`}>
@@ -466,10 +442,10 @@ function IssueCard({
       <div className="issue-actions">
         <select
           className="activity-select"
-          value={selectedActivity}
-          onChange={(e) => onActivityChange(e.target.value as ActivityType)}
+          value={selectedType}
+          onChange={(e) => onActivityChange(e.target.value)}
         >
-          {ACTIVITIES.map((a) => (
+          {activityOptions.map((a) => (
             <option key={a}>{a}</option>
           ))}
         </select>

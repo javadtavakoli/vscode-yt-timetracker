@@ -1,9 +1,7 @@
 import {
   TimerCore,
   YouTrackClient,
-  type ActivityType,
   type AppConfig,
-  type BoardColumn,
   type Issue,
   type Session,
   type SessionStorage,
@@ -111,8 +109,9 @@ export async function bootstrapDesktopHost(): Promise<void> {
 
   let client: YouTrackClient | null = null;
   let issues: Issue[] = [];
-  let states: string[] = [];
-  let boardColumns: BoardColumn[] | null = null;
+  let moveField = "State";
+  let moveValues: string[] = [];
+  let workItemTypes: string[] = [];
   let connected = false;
   let errorMsg = "";
 
@@ -120,8 +119,9 @@ export async function bootstrapDesktopHost(): Promise<void> {
     transport.deliverToUI({
       type: "init",
       issues,
-      states,
-      boardColumns,
+      moveField,
+      moveValues,
+      workItemTypes,
       session: core.session,
       elapsedMs: core.totalElapsedMs,
       connected,
@@ -154,7 +154,7 @@ export async function bootstrapDesktopHost(): Promise<void> {
   core.onLogged(async (issueId) => {
     if (!client) return;
     try {
-      const updated = await client.getIssue(issueId);
+      const updated = await client.getIssue(issueId, moveField);
       const idx = issues.findIndex((i) => i.id === issueId);
       if (idx >= 0) {
         issues[idx].spentTime = updated.spentTime;
@@ -190,8 +190,8 @@ export async function bootstrapDesktopHost(): Promise<void> {
       await client.ping();
       connected = true;
       errorMsg = "";
-      core.setLogger(async ({ issueId, minutes, description, startedAt }) => {
-        await client!.logTime(issueId, minutes, description, startedAt);
+      core.setLogger(async ({ issueId, minutes, description, startedAt, type }) => {
+        await client!.logTime(issueId, minutes, description, startedAt, type);
       });
     } catch (err) {
       connected = false;
@@ -211,14 +211,15 @@ export async function bootstrapDesktopHost(): Promise<void> {
       return;
     }
     try {
-      const [fetchedIssues, fetchedStates, fetchedColumns] = await Promise.all([
-        client.getIssues(config.projectId, config.myIssuesOnly),
-        client.getStates(config.projectId),
-        client.getBoardColumns(config.projectId),
+      const move = await client.getMoveOptions(config.projectId);
+      moveField = move.field;
+      moveValues = move.values;
+      const [fetchedIssues, fetchedTypes] = await Promise.all([
+        client.getIssues(config.projectId, config.myIssuesOnly, "", moveField),
+        client.getWorkItemTypes(),
       ]);
       issues = fetchedIssues;
-      states = fetchedStates;
-      boardColumns = fetchedColumns;
+      workItemTypes = fetchedTypes;
       errorMsg = "";
     } catch (err) {
       errorMsg = `Failed to load issues: ${err}`;
@@ -239,13 +240,13 @@ export async function bootstrapDesktopHost(): Promise<void> {
           cmd.issueId,
           cmd.issueReadable,
           cmd.summary,
-          cmd.activity as ActivityType,
+          cmd.workItemType,
           prior
         );
         break;
       }
       case "startCustom":
-        core.start(null, "", cmd.summary, cmd.activity as ActivityType, 0);
+        core.start(null, "", cmd.summary, cmd.workItemType, 0);
         break;
       case "pauseResume":
         core.togglePause();
@@ -303,9 +304,9 @@ export async function bootstrapDesktopHost(): Promise<void> {
       case "move":
         if (!client) return;
         try {
-          await client.moveIssue(cmd.issueId, cmd.state);
+          await client.moveIssue(cmd.issueId, moveField, cmd.value);
           const issue = issues.find((i) => i.id === cmd.issueId);
-          if (issue) issue.state = cmd.state;
+          if (issue) issue.state = cmd.value;
           sendInit();
         } catch (err) {
           errorMsg = `Failed to move issue: ${err}`;
