@@ -13,6 +13,9 @@
     "build": "tsc -p ./",
     "watch": "tsc -p ./ --watch"
   },
+  "dependencies": {
+    "trackpilot": "^0.3.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.3.0"

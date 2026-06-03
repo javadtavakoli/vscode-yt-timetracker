@@ -27,3 +27,6 @@ allowBuilds:
   esbuild: set this to true or false
   keytar: set this to true or false
   sharp: set this to true or false
+
+minimumReleaseAgeExclude:
+  - trackpilot@0.3.0

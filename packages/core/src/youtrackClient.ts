@@ -1,4 +1,5 @@
 import type { Issue, BoardColumn, Project } from "./types";
+import { createApi, type TrackpilotApi } from "trackpilot";
 
 /**
  * Fetch-compatible function. Defaults to `globalThis.fetch`. Hosts where the
@@ -12,79 +13,36 @@ export type FetchFn = (
   init?: RequestInit
 ) => Promise<Response>;
 
-async function request(
-  fetchFn: FetchFn,
-  baseUrl: string,
-  token: string,
-  method: string,
-  path: string,
-  body?: unknown
-): Promise<unknown> {
-  const url = new URL(path, baseUrl.endsWith("/") ? baseUrl : baseUrl + "/");
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
-  if (body !== undefined) {
-    headers["Content-Type"] = "application/json";
-  }
-  const response = await fetchFn(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${text}`);
-  }
-  return text ? JSON.parse(text) : {};
-}
+const ISSUE_FIELDS =
+  "id,idReadable,summary,customFields(name,value(name,presentation,minutes),$type)";
 
 export class YouTrackClient {
-  private fetchFn: FetchFn;
+  private api: TrackpilotApi;
 
-  constructor(
-    private baseUrl: string,
-    private token: string,
-    fetchFn?: FetchFn
-  ) {
-    this.fetchFn = fetchFn ?? globalThis.fetch.bind(globalThis);
-  }
-
-  private get<T>(path: string): Promise<T> {
-    return request(
-      this.fetchFn,
-      this.baseUrl,
-      this.token,
-      "GET",
-      path
-    ) as Promise<T>;
-  }
-
-  private post<T>(path: string, body: unknown): Promise<T> {
-    return request(
-      this.fetchFn,
-      this.baseUrl,
-      this.token,
-      "POST",
-      path,
-      body
-    ) as Promise<T>;
+  constructor(baseUrl: string, token: string, fetchFn?: FetchFn) {
+    this.api = createApi({
+      // trackpilot joins `${baseUrl}/api` without normalizing, so a trailing
+      // slash would yield `//api` and break every request — strip it here.
+      baseUrl: baseUrl.replace(/\/$/, ""),
+      token,
+      fetch: fetchFn,
+    });
   }
 
   /** Verify connection and return the authenticated user's display name. */
   async ping(): Promise<string> {
-    const me = await this.get<{ name: string; login: string }>(
-      "api/users/me?fields=name,login"
-    );
-    return me.name || me.login;
+    const me = await this.api.me();
+    return me.name || me.login || "";
   }
 
   /** List projects available to the current user. */
   async getProjects(): Promise<Project[]> {
-    return this.get<Project[]>(
-      "api/admin/projects?fields=id,name,shortName&$top=50"
-    );
+    const projects = await this.api.projects();
+    return projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      shortName: p.shortName,
+    }));
   }
 
   /** Fetch issues for a project, optionally filtered to the current user. */
@@ -96,23 +54,20 @@ export class YouTrackClient {
     const base = `project: {${projectId}}`;
     const filter = myOnly ? `${base} for: me` : base;
     const q = query ? `${filter} ${query}` : filter;
-    const enc = encodeURIComponent(q);
-    const fields =
-      "id,idReadable,summary,customFields(name,value(name,presentation,minutes),$type)";
-    const raw = await this.get<Record<string, unknown>[]>(
-      `api/issues?query=${enc}&fields=${fields}&$top=100`
-    );
-    return raw.map((i) => mapIssue(i));
+    const raw = await this.api.request("GET", "/issues", {
+      query: { query: q, fields: ISSUE_FIELDS, $top: 100 },
+    });
+    return (raw as Record<string, unknown>[]).map((i) => mapIssue(i));
   }
 
   /** Fetch a single issue's current state. */
   async getIssue(issueId: string): Promise<Issue> {
-    const fields =
-      "id,idReadable,summary,customFields(name,value(name,presentation,minutes),$type)";
-    const raw = await this.get<Record<string, unknown>>(
-      `api/issues/${issueId}?fields=${fields}`
+    const raw = await this.api.request(
+      "GET",
+      `/issues/${encodeURIComponent(issueId)}`,
+      { query: { fields: ISSUE_FIELDS } }
     );
-    return mapIssue(raw);
+    return mapIssue(raw as Record<string, unknown>);
   }
 
   /** Log spent time on an issue as a work item. */
@@ -122,41 +77,22 @@ export class YouTrackClient {
     description: string,
     date: number
   ): Promise<void> {
-    await this.post(`api/issues/${issueId}/timeTracking/workItems`, {
-      date,
-      duration: { minutes },
-      text: description,
-      usesMarkdown: false,
-    });
+    await this.api.logWorkItem(issueId, { minutes, text: description, date });
   }
 
-  /** Move an issue to a different state (e.g. between agile columns). */
+  /** Move an issue to a different state via the YouTrack command engine. */
   async moveIssue(issueId: string, stateName: string): Promise<void> {
-    const fields = "id,idReadable,customFields(id,name,value(name))";
-    const issue = await this.get<Record<string, unknown>>(
-      `api/issues/${issueId}?fields=${fields}`
-    );
-    const cfs = (issue.customFields as Record<string, unknown>[]) || [];
-    const stateField = cfs.find(
-      (f) => (f as Record<string, unknown>).name === "State"
-    ) as Record<string, unknown> | undefined;
-
-    if (!stateField) {
-      throw new Error("No State field found on issue");
-    }
-
-    await this.post(
-      `api/issues/${issueId}/fields/${stateField.id}?fields=value(name)`,
-      { value: { name: stateName } }
-    );
+    await this.api.applyCommand(issueId, `State ${stateName}`);
   }
 
   /** Project state field values, used as a fallback when no agile board is set up. */
   async getStates(projectId: string): Promise<string[]> {
     try {
-      const raw = await this.get<Record<string, unknown>[]>(
-        `api/admin/projects/${projectId}/customFields?fields=field(name),bundle(values(name))&$top=50`
-      );
+      const raw = (await this.api.request(
+        "GET",
+        `/admin/projects/${encodeURIComponent(projectId)}/customFields`,
+        { query: { fields: "field(name),bundle(values(name))", $top: 50 } }
+      )) as Record<string, unknown>[];
       for (const cf of raw) {
         const field = cf.field as Record<string, unknown> | undefined;
         if (field?.name === "State") {
@@ -180,11 +116,13 @@ export class YouTrackClient {
     projectShortName: string
   ): Promise<BoardColumn[] | null> {
     try {
-      const fields =
-        "name,projects(shortName),columnSettings(columns(presentation,fieldValues(name)))";
-      const boards = await this.get<Record<string, unknown>[]>(
-        `api/agiles?fields=${fields}&$top=50`
-      );
+      const boards = (await this.api.request("GET", "/agiles", {
+        query: {
+          fields:
+            "name,projects(shortName),columnSettings(columns(presentation,fieldValues(name)))",
+          $top: 50,
+        },
+      })) as Record<string, unknown>[];
 
       const myBoard = boards.find((b) => {
         const projects = (b.projects as Record<string, unknown>[]) || [];
