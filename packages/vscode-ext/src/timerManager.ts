@@ -4,7 +4,6 @@ import {
   YouTrackClient,
   formatDhms,
   formatDuration,
-  type ActivityType,
   type Session,
 } from "@ylate/core";
 import { WorkspaceStateStorage } from "./storage";
@@ -64,8 +63,8 @@ export class TimerManager {
   /** Bind a YouTrack client so `stop(true)` actually posts work items. */
   setClient(client: YouTrackClient | null) {
     if (client) {
-      this.core.setLogger(async ({ issueId, minutes, description, startedAt }) => {
-        await client.logTime(issueId, minutes, description, startedAt);
+      this.core.setLogger(async ({ issueId, minutes, description, startedAt, type }) => {
+        await client.logTime(issueId, minutes, description, startedAt, type);
       });
     } else {
       this.core.setLogger(null);
@@ -84,10 +83,10 @@ export class TimerManager {
     issueId: string | null,
     issueReadable: string,
     summary: string,
-    activity: ActivityType,
+    workItemType: string,
     priorSpentMinutes: number
   ): void {
-    this.core.start(issueId, issueReadable, summary, activity, priorSpentMinutes);
+    this.core.start(issueId, issueReadable, summary, workItemType, priorSpentMinutes);
   }
 
   pause(): void {
@@ -115,14 +114,14 @@ export class TimerManager {
     const ms = this.core.totalElapsedMs;
     const wasIssue = !!sess.issueId;
     const issueReadable = sess.issueReadable;
-    const activity = sess.activity;
+    const workItemType = sess.workItemType;
     const summary = sess.summary;
 
     await this.core.stop(log);
 
     if (log && wasIssue && ms >= 60_000) {
       vscode.window.showInformationMessage(
-        `✅ Logged ${formatDuration(ms)} on ${issueReadable} (${activity})`
+        `✅ Logged ${formatDuration(ms)} on ${issueReadable}${workItemType ? ` (${workItemType})` : ""}`
       );
     } else if (log && !wasIssue) {
       vscode.window.showInformationMessage(
@@ -159,7 +158,7 @@ export class TimerManager {
     const label = sess.issueReadable || sess.summary.slice(0, 20);
     const icon = paused ? "$(debug-pause)" : "$(clock)";
     this.statusBar.text = `${icon} ${label}  ${formatDhms(ms)}${paused ? "  PAUSED" : ""}`;
-    this.statusBar.tooltip = `${sess.summary}\n${sess.activity}\nClick for actions`;
+    this.statusBar.tooltip = `${sess.summary}${sess.workItemType ? `\n${sess.workItemType}` : ""}\nClick for actions`;
     this.statusBar.backgroundColor = paused
       ? new vscode.ThemeColor("statusBarItem.warningBackground")
       : undefined;

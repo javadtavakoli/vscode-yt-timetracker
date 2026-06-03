@@ -2,16 +2,15 @@ import * as vscode from "vscode";
 import {
   YouTrackClient,
   type Issue,
-  type ActivityType,
-  type BoardColumn,
 } from "@ylate/core";
 import { TimerManager } from "./timerManager";
 import panelHtml from "@ylate/ui";
 
 let client: YouTrackClient | null = null;
 let issues: Issue[] = [];
-let states: string[] = [];
-let boardColumns: BoardColumn[] | null = null;
+let moveField = "State";
+let moveValues: string[] = [];
+let workItemTypes: string[] = [];
 let timerManager: TimerManager;
 let webviewView: vscode.WebviewView | undefined;
 let connected = false;
@@ -40,7 +39,7 @@ export async function activate(context: vscode.ExtensionContext) {
   timerManager.onLogged(async (issueId) => {
     if (!client) return;
     try {
-      const updated = await client.getIssue(issueId);
+      const updated = await client.getIssue(issueId, moveField);
       const idx = issues.findIndex((i) => i.id === issueId);
       if (idx >= 0) {
         issues[idx].spentTime = updated.spentTime;
@@ -86,11 +85,11 @@ class TrackerWebviewProvider implements vscode.WebviewViewProvider {
         case "start": {
           const issue = issues.find((i) => i.id === msg.issueId);
           const prior = issue?.spentTime ?? 0;
-          timerManager.start(msg.issueId, msg.issueReadable, msg.summary, msg.activity as ActivityType, prior);
+          timerManager.start(msg.issueId, msg.issueReadable, msg.summary, msg.workItemType, prior);
           break;
         }
         case "startCustom":
-          timerManager.start(null, "", msg.summary, msg.activity as ActivityType, 0);
+          timerManager.start(null, "", msg.summary, msg.workItemType, 0);
           break;
         case "pauseResume":
           timerManager.togglePause();
@@ -105,7 +104,7 @@ class TrackerWebviewProvider implements vscode.WebviewViewProvider {
           await runConfigure();
           break;
         case "move":
-          await moveIssue(msg.issueId, msg.state);
+          await moveIssue(msg.issueId, msg.value);
           break;
         case "openExternal":
           if (typeof msg.url === "string" && msg.url) {
@@ -128,8 +127,9 @@ function sendAll() {
   webviewView.webview.postMessage({
     type: "init",
     issues,
-    states,
-    boardColumns,
+    moveField,
+    moveValues,
+    workItemTypes,
     session: timerManager.current,
     elapsedMs: timerManager.totalElapsedMs,
     connected,
@@ -194,14 +194,15 @@ async function refreshTasks() {
   }
 
   try {
-    const [fetchedIssues, fetchedStates, fetchedColumns] = await Promise.all([
-      client.getIssues(projectId, myOnly),
-      client.getStates(projectId),
-      client.getBoardColumns(projectId),
+    const move = await client.getMoveOptions(projectId);
+    moveField = move.field;
+    moveValues = move.values;
+    const [fetchedIssues, fetchedTypes] = await Promise.all([
+      client.getIssues(projectId, myOnly, "", moveField),
+      client.getWorkItemTypes(),
     ]);
     issues = fetchedIssues;
-    states = fetchedStates;
-    boardColumns = fetchedColumns;
+    workItemTypes = fetchedTypes;
     errorMsg = "";
   } catch (err) {
     errorMsg = `Failed to load issues: ${err}`;
@@ -209,13 +210,13 @@ async function refreshTasks() {
   sendAll();
 }
 
-async function moveIssue(issueId: string, state: string) {
+async function moveIssue(issueId: string, value: string) {
   if (!client) return;
   try {
-    await client.moveIssue(issueId, state);
+    await client.moveIssue(issueId, moveField, value);
     const issue = issues.find((i) => i.id === issueId);
-    if (issue) issue.state = state;
-    vscode.window.showInformationMessage(`Moved issue to "${state}"`);
+    if (issue) issue.state = value;
+    vscode.window.showInformationMessage(`Moved issue to "${value}"`);
     sendAll();
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to move issue: ${err}`);
@@ -279,13 +280,16 @@ async function cmdStartCustom() {
   });
   if (!name) return;
 
-  const actPick = await vscode.window.showQuickPick(
-    ["Implementing", "Investigating", "Testing", "Reviewing", "Other"],
-    { title: "Activity Type" }
-  );
-  if (!actPick) return;
+  let workItemType = "";
+  if (workItemTypes.length) {
+    const pick = await vscode.window.showQuickPick(workItemTypes, {
+      title: "Work Item Type",
+    });
+    if (pick === undefined) return;
+    workItemType = pick;
+  }
 
-  timerManager.start(null, "", name, actPick as ActivityType, 0);
+  timerManager.start(null, "", name, workItemType, 0);
 }
 
 async function showStatusBarMenu() {
@@ -305,7 +309,7 @@ async function showStatusBarMenu() {
 
   const headerLabel = session.issueReadable || session.summary;
   const pick = await vscode.window.showQuickPick(items, {
-    title: `${headerLabel} — ${session.activity}`,
+    title: session.workItemType ? `${headerLabel} — ${session.workItemType}` : headerLabel,
     placeHolder: "What now?",
   });
   if (!pick) return;
