@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **pnpm + Turbo monorepo**.
 
-- [`packages/core`](packages/core) — `@ylate/core`. Pure timer state machine + YouTrack HTTP client + shared types + host↔UI message contract. No VS Code, no DOM, no `setInterval`. Output is ESM (`"type": "module"`) so Vite/Rollup can statically resolve named exports. Runs in Node, browsers, Electron, and Tauri.
+- [`packages/core`](packages/core) — `@ylate/core`. Pure timer state machine + YouTrack client (a thin wrapper over the [`trackpilot`](https://www.npmjs.com/package/trackpilot) library) + shared types + host↔UI message contract. No VS Code, no DOM, no `setInterval`. Output is ESM (`"type": "module"`) so Vite/Rollup can statically resolve named exports. Runs in Node, browsers, Electron, and Tauri.
 - [`packages/ui`](packages/ui) — `@ylate/ui`. React + Vite panel UI, built to a single self-contained HTML (`vite-plugin-singlefile`). Bundle detects host: VS Code's `acquireVsCodeApi()` or Tauri's `window.__TAURI_INTERNALS__`. When running in Tauri it bootstraps an in-renderer host (`desktopHost.ts`) that owns `TimerCore` and persists via `tauri-plugin-store`.
 - [`packages/vscode-ext`](packages/vscode-ext) — the VS Code extension (`JavadTavakoli.ylate`). Thin host shell over `@ylate/core`; inlines `@ylate/ui`'s HTML at bundle time via esbuild's `--loader:.html=text`.
 - [`packages/desktop`](packages/desktop) — `@ylate/desktop`. Tauri 2 app (Win/Mac/Linux). Rust backend provides system tray (live title on macOS / tooltip on Windows/Linux), window-close-hides-to-tray, single-instance lock, opt-in autostart. Frontend is the same `@ylate/ui` bundle, no separate Vite app. See [packages/desktop/README.md](packages/desktop/README.md) for the system-deps install.
@@ -53,7 +53,13 @@ pnpm --filter @ylate/ui build && pnpm --filter ylate package
 - **YouTrack logging is injected** via `core.setLogger(fn)`. When `stop(true)` is called and there's an issue id + ≥ 1 minute, the logger fn is awaited. Success fires `onLogged(issueId)`; failure fires `onLogError`.
 - **`displayMs`** = `priorSpentMinutes * 60_000 + totalElapsedMs`. The first term is YouTrack's recorded spent time at session start; the second is the live session elapsed. Stop & Log only posts the second term — the server adds it to its running total.
 
-[`packages/core/src/youtrackClient.ts`](packages/core/src/youtrackClient.ts) uses the global `fetch` (Node ≥ 18, browsers, Tauri webview — one impl everywhere). Issue conversion lives in `mapIssue()`. **Adding a new visible field still means extending both the `fields=` query string and `mapIssue` in lockstep** — forgetting the query string silently returns empty values.
+[`packages/core/src/youtrackClient.ts`](packages/core/src/youtrackClient.ts) is a thin facade over the **`trackpilot`** npm package (the user's own; source at `/home/javad/Projects/youtrack-cli`). The constructor builds `createApi({ baseUrl, token, fetch })` from trackpilot and every method delegates: `ping`→`me()`, `getProjects`→`projects()`, `moveIssue`→`applyCommand()`, `logTime`→`logWorkItem()`. Reads that trackpilot doesn't model (issues, the agile board's move-field + values via `getMoveOptions()`, work-item types) go through trackpilot's low-level `request()` escape hatch, and issue conversion still lives in `mapIssue()`. An injectable `fetch` is threaded through to `createApi` (the Tauri/Linux host injects a native fetch to dodge WebKit2GTK CORS); trackpilot's own `request` defaults to the global `fetch` everywhere else.
+
+Two non-obvious rules:
+- **Adding a new visible issue field** still means extending both the `ISSUE_FIELDS` query string and `mapIssue` in lockstep — forgetting the query string silently returns empty values.
+- **The move target is discovered, not hardcoded.** A board can be organized by any state-type custom field (not just `State`); `getMoveOptions()` reads `columnSettings.field.name` and that field's full bundle, and `moveIssue` braces both tokens (`` `{${field}} {${value}}` ``) so multi-word fields/values parse. **Work-item types must be referenced by `{ id }`, not name** — YouTrack 400s on name, so `logTime` resolves the chosen type name → id first.
+
+Changing trackpilot itself means editing `/home/javad/Projects/youtrack-cli` and pushing to its `main` (CI auto-publishes to npm via conventional-commit version bump); then bump `trackpilot` in [`packages/core/package.json`](packages/core/package.json).
 
 ### `packages/ui` — the React panel
 
