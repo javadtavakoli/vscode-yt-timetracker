@@ -97,16 +97,23 @@ export class YouTrackClient {
     }
   }
 
-  /** Work-item types defined by the instance. Empty when not readable. */
-  async getWorkItemTypes(): Promise<string[]> {
+  /** Work-item types defined by the instance (id + name). Empty when not readable. */
+  private async fetchWorkItemTypes(): Promise<{ id: string; name: string }[]> {
     try {
       const raw = (await this.api.request("GET", "/admin/timeTrackingSettings/workItemTypes", {
-        query: { fields: "name", $top: 100 },
+        query: { fields: "id,name", $top: 100 },
       })) as Record<string, unknown>[];
-      return (raw || []).map((t) => String(t.name)).filter(Boolean);
+      return (raw || [])
+        .map((t) => ({ id: String(t.id), name: String(t.name) }))
+        .filter((t) => t.id && t.name && t.name !== "undefined");
     } catch {
       return [];
     }
+  }
+
+  /** Work-item type names defined by the instance. Empty when not readable. */
+  async getWorkItemTypes(): Promise<string[]> {
+    return (await this.fetchWorkItemTypes()).map((t) => t.name);
   }
 
   /** Fetch issues for a project, optionally filtered to the current user. */
@@ -135,7 +142,12 @@ export class YouTrackClient {
     return mapIssue(raw as Record<string, unknown>, moveField);
   }
 
-  /** Log spent time on an issue as a work item, optionally with a type. */
+  /**
+   * Log spent time on an issue as a work item, optionally with a type.
+   * `type` is a work-item type NAME; it is resolved to the instance's type id
+   * because YouTrack cannot locate a work-item type by name. If the name can't
+   * be resolved, the work item is logged without a type rather than failing.
+   */
   async logTime(
     issueId: string,
     minutes: number,
@@ -143,7 +155,12 @@ export class YouTrackClient {
     date: number,
     type?: string
   ): Promise<void> {
-    await this.api.logWorkItem(issueId, { minutes, text: description, date, type });
+    let typeRef: { id: string } | undefined;
+    if (type) {
+      const match = (await this.fetchWorkItemTypes()).find((t) => t.name === type);
+      if (match) typeRef = { id: match.id };
+    }
+    await this.api.logWorkItem(issueId, { minutes, text: description, date, type: typeRef });
   }
 
   /** Move an issue by setting the board's column field via the command engine. */
